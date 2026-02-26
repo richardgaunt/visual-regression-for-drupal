@@ -6,7 +6,11 @@ Visual regression package designed for running visual regression for CivicTheme 
 
 ## Installation
 
-Run `npm install` to install dependencies, then `npm start` to launch the tool. The CLI provides options to create projects, capture screenshots, and generate comparison reports.
+```bash
+npm install -g @richardgaunt/visual-regression-for-drupal
+```
+
+Then run `vr-drupal init` inside your project to get started. The CLI provides options to create projects, capture screenshots, and generate comparison reports.
 
 ## Features
 
@@ -16,15 +20,50 @@ Run `npm install` to install dependencies, then `npm start` to launch the tool. 
 
 See [COMMANDS.md](./COMMANDS.md) for full CLI documentation and usage examples.
 
+## Project Structure
+
+Projects are stored locally in a `.visual-regression/` directory relative to your working directory. Each named project gets its own subdirectory. Multiple projects per directory are supported.
+
+```
+your-repo/
+  .visual-regression/
+    my-site/
+      project.json
+      screenshot-sets/
+        sets/...
+        comparisons/...
+    another-site/
+      project.json
+      screenshot-sets/...
+```
+
+When only one project exists in `.visual-regression/`, commands like `vr-drupal take` and `vr-drupal compare` will auto-select it without prompting.
+
+## Quick Start
+
+```bash
+# Initialize a project (creates .visual-regression/<name>/)
+vr-drupal init --name "My Site" --url https://example.com
+
+# Take a baseline snapshot
+vr-drupal take --id baseline
+
+# Take another snapshot after changes
+vr-drupal take --id after-update
+
+# Compare the two snapshots
+vr-drupal compare --source baseline --target after-update --open
+```
+
 ## Project Configuration (project.json)
 
-Each project stores its configuration in a `project.json` file located at `projects/<project-name>/project.json`. This file defines all settings for visual regression testing and can be manually edited to customize your project.
+Each project stores its configuration in a `project.json` file located at `.visual-regression/<project-name>/project.json`. This file defines all settings for visual regression testing and can be manually edited to customize your project.
 
 ### File Location
 
 After creating a project, you can find its configuration at:
 ```
-projects/
+.visual-regression/
   └── your-project-name/
       └── project.json
 ```

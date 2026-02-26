@@ -5,8 +5,8 @@ This document describes all available CLI commands for the `vr-drupal` tool. The
 ## Installation
 
 ```bash
-# Install globally
-npm install -g .
+# Install from npm
+npm install -g @richardgaunt/visual-regression-for-drupal
 
 # Or link for development
 npm link
@@ -38,11 +38,11 @@ These options apply to the main `vr-drupal` command:
 | `-V, --version` | Output the version number |
 | `-h, --help` | Display help for command |
 
-### Interactive Mode with External Project
+### Interactive Mode with Specific Project
 
 ```bash
 # Launch interactive menu for a specific project directory
-vr-drupal --project-dir ./visual-regression
+vr-drupal --project-dir .visual-regression/my-site
 ```
 
 This loads the project from the specified directory and shows an interactive menu to take snapshots or compare them.
@@ -51,7 +51,7 @@ This loads the project from the specified directory and shows an interactive men
 
 ## vr-drupal init
 
-Initialize a new visual regression project. Creates a `project.json` configuration file.
+Initialize a new visual regression project. Creates a `.visual-regression/<name>/project.json` configuration file.
 
 ### Usage
 
@@ -67,7 +67,8 @@ vr-drupal init [options]
 | `--url <url>` | Base URL to screenshot (e.g., https://example.com) | (prompted) |
 | `--paths <paths>` | Comma-separated paths to screenshot (e.g., /,/about,/contact) | auto-detect or default |
 | `--viewports <viewports>` | Viewport presets: mobile,tablet,desktop | all |
-| `--output-dir <dir>` | Output directory for project.json | ./visual-regression |
+| `--project-root <dir>` | Project root directory (output will be `<root>/.visual-regression/<name>/`) | `.` |
+| `--output-dir <dir>` | Output directory (overrides --project-root) | `.visual-regression/<name>/` |
 | `--detect-paths` | Auto-detect paths from CivicTheme export endpoint | false |
 | `--no-interactive` | Fail if required options missing (for CI/CD) | false |
 
@@ -83,20 +84,24 @@ vr-drupal init \
   --url https://example.com \
   --paths /,/about,/contact \
   --viewports mobile,desktop \
-  --output-dir ./visual-regression \
   --no-interactive
 
 # Auto-detect paths from CivicTheme
 vr-drupal init \
   --name "CivicTheme Site" \
   --url https://civictheme.example.com \
-  --detect-paths \
-  --output-dir ./visual-regression
+  --detect-paths
+
+# Initialize in a different root directory
+vr-drupal init \
+  --name "My Site" \
+  --url https://example.com \
+  --project-root /path/to/repo
 ```
 
 ### Output
 
-Creates `project.json` in the specified output directory with:
+Creates `.visual-regression/<name>/project.json` with:
 - Project name and directory name
 - Visual regression configuration (base URL, paths, viewports)
 - Advanced settings (masking selectors, CSS transition handling, settle delay)
@@ -117,13 +122,13 @@ vr-drupal take [project] [options]
 
 | Argument | Description |
 |----------|-------------|
-| `project` | Project name (for built-in projects in ./projects/) |
+| `project` | Project name (subdirectory within `.visual-regression/`) |
 
 ### Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--project-dir <dir>` | Directory containing project.json | (uses built-in projects) |
+| `--project-dir <dir>` | Directory containing project.json | (auto-discovered) |
 | `--id <id>` | Snapshot ID | snapshot-YYYYMMDD |
 | `--auth-type <type>` | Authentication type: none, basic, cookie | none |
 | `--username <user>` | Basic auth username | (prompted if auth-type=basic) |
@@ -135,32 +140,29 @@ vr-drupal take [project] [options]
 ### Examples
 
 ```bash
-# Interactive - select project and options
-vr-drupal take
+# Auto-discover project (when only one project exists)
+vr-drupal take --id before-update
 
-# Take snapshot for built-in project
-vr-drupal take my-project --id before-update
+# Take snapshot for a named project
+vr-drupal take my-site --id before-update
 
-# Take snapshot for external project
-vr-drupal take --project-dir ./visual-regression --id baseline
+# Take snapshot with explicit project directory
+vr-drupal take --project-dir .visual-regression/my-site --id baseline
 
 # With basic authentication
-vr-drupal take \
-  --project-dir ./visual-regression \
+vr-drupal take my-site \
   --id authenticated-snapshot \
   --auth-type basic \
   --username admin \
   --password secret
 
 # With session cookies
-vr-drupal take \
-  --project-dir ./visual-regression \
+vr-drupal take my-site \
   --id session-snapshot \
   --cookies "SESS123=abc123; token=xyz789"
 
 # Non-interactive for CI/CD
-vr-drupal take \
-  --project-dir ./visual-regression \
+vr-drupal take my-site \
   --id ci-snapshot-$BUILD_NUMBER \
   --no-interactive
 ```
@@ -187,13 +189,13 @@ vr-drupal compare [project] [options]
 
 | Argument | Description |
 |----------|-------------|
-| `project` | Project name (for built-in projects) |
+| `project` | Project name (subdirectory within `.visual-regression/`) |
 
 ### Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--project-dir <dir>` | Directory containing project.json | (uses built-in projects) |
+| `--project-dir <dir>` | Directory containing project.json | (auto-discovered) |
 | `--source <id>` | Source (before) snapshot ID | (prompted) |
 | `--target <id>` | Target (after) snapshot ID | (prompted) |
 | `--open` | Open report in browser after comparison | false |
@@ -203,28 +205,20 @@ vr-drupal compare [project] [options]
 ### Examples
 
 ```bash
-# Interactive - select project and snapshots
+# Auto-discover project and select snapshots interactively
 vr-drupal compare
 
-# Compare specific snapshots for built-in project
-vr-drupal compare my-project --source before --target after
-
-# Compare for external project
-vr-drupal compare \
-  --project-dir ./visual-regression \
-  --source baseline \
-  --target current
+# Compare specific snapshots for a named project
+vr-drupal compare my-site --source before --target after
 
 # Compare and open report
-vr-drupal compare \
-  --project-dir ./visual-regression \
+vr-drupal compare my-site \
   --source baseline \
   --target current \
   --open
 
 # JSON output for scripting
-vr-drupal compare \
-  --project-dir ./visual-regression \
+vr-drupal compare my-site \
   --source baseline \
   --target current \
   --output-format json \
@@ -327,13 +321,13 @@ vr-drupal show [project] [options]
 
 | Argument | Description |
 |----------|-------------|
-| `project` | Project name (for built-in projects) |
+| `project` | Project name (subdirectory within `.visual-regression/`) |
 
 ### Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--project-dir <dir>` | Directory containing project.json | (uses built-in projects) |
+| `--project-dir <dir>` | Directory containing project.json | (auto-discovered) |
 | `--snapshots` | List snapshots only | false |
 | `--comparisons` | List comparisons only | false |
 | `--config` | Show full configuration only | false |
@@ -342,26 +336,26 @@ vr-drupal show [project] [options]
 ### Examples
 
 ```bash
-# Show all details for a project
-vr-drupal show my-project
+# Show all details (auto-discover or select interactively)
+vr-drupal show
 
-# Show project from external directory
-vr-drupal show --project-dir ./visual-regression
+# Show a named project
+vr-drupal show my-site
 
 # Show only snapshots
-vr-drupal show my-project --snapshots
+vr-drupal show my-site --snapshots
 
 # Show only comparisons
-vr-drupal show my-project --comparisons
+vr-drupal show my-site --comparisons
 
 # Show only configuration
-vr-drupal show my-project --config
+vr-drupal show my-site --config
 
 # JSON output
-vr-drupal show my-project --format json
+vr-drupal show my-site --format json
 
 # JSON output of snapshots only
-vr-drupal show my-project --snapshots --format json
+vr-drupal show my-site --snapshots --format json
 ```
 
 ### Output
@@ -419,13 +413,13 @@ vr-drupal delete [project] [options]
 
 | Argument | Description |
 |----------|-------------|
-| `project` | Project name (for built-in projects) |
+| `project` | Project name (subdirectory within `.visual-regression/`) |
 
 ### Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--project-dir <dir>` | Directory containing project.json | (uses built-in projects) |
+| `--project-dir <dir>` | Directory containing project.json | (auto-discovered) |
 | `--snapshot <id>` | Delete specific snapshot only | (none) |
 | `--comparison <id>` | Delete specific comparison only | (none) |
 | `--force` | Skip confirmation prompt | false |
@@ -438,23 +432,19 @@ vr-drupal delete [project] [options]
 vr-drupal delete
 
 # Delete entire project (with confirmation)
-vr-drupal delete my-project
+vr-drupal delete my-site
 
 # Delete project without confirmation
-vr-drupal delete my-project --force
+vr-drupal delete my-site --force
 
 # Delete specific snapshot
-vr-drupal delete my-project --snapshot old-snapshot
+vr-drupal delete my-site --snapshot old-snapshot
 
 # Delete specific comparison
-vr-drupal delete my-project --comparison baseline--old
-
-# Delete from external project directory
-vr-drupal delete --project-dir ./visual-regression --snapshot outdated
+vr-drupal delete my-site --comparison baseline--old
 
 # Non-interactive deletion
-vr-drupal delete \
-  --project-dir ./visual-regression \
+vr-drupal delete my-site \
   --snapshot old-snapshot \
   --force \
   --no-interactive
@@ -490,13 +480,13 @@ vr-drupal delete \
 | Variable | Description |
 |----------|-------------|
 | `VR_DRUPAL_PROJECT_DIR` | Default project directory for `--project-dir` option |
-| `VR_DRUPAL_PROJECTS_DIR` | Override default location for built-in projects (used for testing) |
+| `VR_DRUPAL_PROJECTS_DIR` | Override base `.visual-regression/` location (used for testing) |
 
 ### Using Environment Variables
 
 ```bash
-# Set default project directory
-export VR_DRUPAL_PROJECT_DIR=./visual-regression
+# Point to a specific project directory
+export VR_DRUPAL_PROJECT_DIR=.visual-regression/my-site
 
 # Now all commands use this directory without needing --project-dir
 vr-drupal take --id baseline
@@ -511,29 +501,25 @@ vr-drupal show
 For automated pipelines, use `--no-interactive` to ensure commands fail rather than prompt:
 
 ```bash
-# Initialize project
+# Initialize project (creates .visual-regression/ci-project/)
 vr-drupal init \
   --name "CI Project" \
   --url $SITE_URL \
   --detect-paths \
-  --output-dir ./visual-regression \
   --no-interactive
 
-# Take baseline screenshot
+# Take baseline screenshot (auto-discovers the project)
 vr-drupal take \
-  --project-dir ./visual-regression \
   --id baseline-$CI_COMMIT_SHA \
   --no-interactive
 
 # Take comparison screenshot
 vr-drupal take \
-  --project-dir ./visual-regression \
   --id pr-$CI_MERGE_REQUEST_IID \
   --no-interactive
 
 # Compare and get JSON result
 RESULT=$(vr-drupal compare \
-  --project-dir ./visual-regression \
   --source baseline-$CI_COMMIT_SHA \
   --target pr-$CI_MERGE_REQUEST_IID \
   --output-format json \
@@ -551,20 +537,26 @@ fi
 
 ## Project Directory Structure
 
-When using `--project-dir`, the tool expects and creates this structure:
+Projects live in `.visual-regression/<project-name>/` relative to your working directory:
 
 ```
-<project-dir>/
-├── project.json              # Project configuration
-└── screenshot-sets/
-    ├── sets/
-    │   ├── <snapshot-id>/    # Screenshots organized by viewport
-    │   │   ├── mobile/
-    │   │   ├── tablet/
-    │   │   └── desktop/
-    │   └── <snapshot-id>/
-    └── comparisons/
-        └── <source>--<target>/  # Comparison reports
-            ├── index.html       # Visual HTML report
-            └── reg.json         # Statistics JSON
+.visual-regression/
+└── my-site/
+    ├── project.json              # Project configuration
+    ├── .gitignore                # Ignores generated screenshot data
+    └── screenshot-sets/
+        ├── sets/
+        │   ├── <snapshot-id>/    # Screenshots organized by viewport
+        │   │   ├── mobile/
+        │   │   ├── tablet/
+        │   │   └── desktop/
+        │   └── <snapshot-id>/
+        └── comparisons/
+            └── <source>--<target>/  # Comparison reports
+                ├── index.html       # Visual HTML report
+                └── reg.json         # Statistics JSON
 ```
+
+### Auto-Discovery
+
+When only one project exists in `.visual-regression/`, commands automatically use it without requiring a project name or `--project-dir`. When multiple projects exist, you can specify by name (`vr-drupal take my-site`) or interactively select from a list.
