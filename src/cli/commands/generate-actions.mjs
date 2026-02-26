@@ -1,10 +1,11 @@
 /**
- * CLI command: ct-vizdiff generate-actions
+ * CLI command: vr-drupal generate-actions
  * Generate GitHub Actions workflow files for visual regression testing
  */
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import path from 'path';
 import { join, resolve } from 'path';
 import { confirm } from '@inquirer/prompts';
 import {
@@ -12,10 +13,11 @@ import {
   renderTemplate,
   buildTemplateVariables,
 } from '../../lib/github-actions/template-renderer.mjs';
+import { resolveProjectDir } from '../../utils/project-manager.mjs';
 
 export const generateActionsCommand = new Command('generate-actions')
   .description('Generate GitHub Actions workflows for visual regression testing')
-  .option('--project-dir <dir>', 'Project directory containing project.json', './visual-regression')
+  .option('--project-dir <dir>', 'Project directory containing project.json')
   .option('--output-dir <dir>', 'Output directory for workflow files', '.github/workflows')
   .option('--baseline-branches <branches>', 'Comma-separated branches for baseline triggers', 'main')
   .option('--node-version <version>', 'Node.js version for workflows', '22')
@@ -26,20 +28,28 @@ export const generateActionsCommand = new Command('generate-actions')
   .option('--no-interactive', 'Run non-interactively')
   .action(async (options) => {
     const isInteractive = options.interactive !== false;
-    const projectDir = resolve(options.projectDir);
+    const resolvedDir = options.projectDir ? resolve(options.projectDir) : resolveProjectDir(options);
     const outputDir = resolve(options.outputDir);
+
+    if (!resolvedDir) {
+      console.error(chalk.red('Error: No project found. Use --project-dir or create a project with: vr-drupal init'));
+      process.exit(3);
+    }
+
+    const projectDir = resolve(resolvedDir);
 
     // Validate project directory has project.json
     const configPath = join(projectDir, 'project.json');
     if (!existsSync(configPath)) {
       console.error(chalk.red(`Error: No project.json found in ${projectDir}`));
-      console.error(chalk.yellow('Run "ct-vizdiff init" first to create a project.'));
+      console.error(chalk.yellow('Run "vr-drupal init" first to create a project.'));
       process.exit(3);
     }
 
-    // Build template variables
+    // Build template variables — use the original --project-dir value if given, else the resolved relative path
+    const templateProjectDir = options.projectDir || path.relative(process.cwd(), projectDir);
     const variables = buildTemplateVariables({
-      projectDir: options.projectDir,
+      projectDir: templateProjectDir,
       baselineBranches: options.baselineBranches,
       nodeVersion: options.nodeVersion,
       installCommand: options.installCommand,
@@ -97,7 +107,7 @@ export const generateActionsCommand = new Command('generate-actions')
     console.log(chalk.white(`  ${comparePath}`));
     console.log();
     console.log(chalk.cyan('Configuration:'));
-    console.log(chalk.white(`  Project directory: ${options.projectDir}`));
+    console.log(chalk.white(`  Project directory: ${templateProjectDir}`));
     console.log(chalk.white(`  Baseline branches: ${options.baselineBranches}`));
     console.log(chalk.white(`  Node.js version: ${options.nodeVersion}`));
     console.log(chalk.white(`  Auth sections: ${options.withAuth ? 'included' : 'not included'}`));

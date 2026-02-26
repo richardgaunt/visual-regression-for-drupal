@@ -9,14 +9,7 @@
  */
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { join, dirname } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const rootDir = join(__dirname, '..', '..', '..');
-const projectsDir = join(rootDir, 'projects');
+import { projectsDir } from '../../utils/project-manager.mjs';
 
 /**
  * Ensure a directory exists, creating it if necessary

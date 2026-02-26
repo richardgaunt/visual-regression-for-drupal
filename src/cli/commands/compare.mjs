@@ -1,5 +1,5 @@
 /**
- * CLI command: ct-vizdiff compare
+ * CLI command: vr-drupal compare
  * Compare visual regression screenshots
  */
 import { Command } from 'commander';
@@ -13,10 +13,10 @@ import { compareScreenshots } from '../../lib/visual-regression/comparison.mjs';
 import { ensureDirectory } from '../../lib/visual-regression/screenshot-set-manager.mjs';
 import {
   getAllProjects,
-  loadProjectConfiguration,
   loadProjectFromDirectory,
   saveProjectToDirectory,
-  resolveProjectDir
+  resolveProjectDir,
+  projectsDir
 } from '../../utils/project-manager.mjs';
 
 /**
@@ -63,8 +63,6 @@ export const compareCommand = new Command('compare')
     const isInteractive = options.interactive !== false;
     let projectConfig = null;
     let projectDir = null;
-    let projectIdentifier = null;
-    let baseDir = null;
 
     // Check for project directory from option or environment variable
     const resolvedProjectDir = resolveProjectDir(options);
@@ -72,27 +70,13 @@ export const compareCommand = new Command('compare')
     // Determine project source
     if (resolvedProjectDir) {
       projectDir = resolve(resolvedProjectDir);
-      projectConfig = loadProjectFromDirectory(projectDir);
-      baseDir = projectDir;
-
-      if (!projectConfig) {
-        console.error(chalk.red(`Error: No project.json found in ${projectDir}`));
-        process.exit(3);
-      }
-      projectIdentifier = projectDir;
     } else if (projectArg) {
-      projectConfig = loadProjectConfiguration(projectArg);
-      if (!projectConfig) {
-        console.error(chalk.red(`Error: Project "${projectArg}" not found`));
-        process.exit(3);
-      }
-      projectIdentifier = projectArg;
-      baseDir = join(process.cwd(), 'projects', projectArg);
+      projectDir = join(projectsDir, projectArg);
     } else if (isInteractive) {
       const projects = getAllProjects();
 
       if (projects.length === 0) {
-        console.error(chalk.red('No projects found. Create one with: ct-vizdiff init'));
+        console.error(chalk.red('No projects found. Create one with: vr-drupal init'));
         process.exit(3);
       }
 
@@ -101,16 +85,21 @@ export const compareCommand = new Command('compare')
         value: p.directoryName
       }));
 
-      projectIdentifier = await select({
+      const selected = await select({
         message: 'Select a project:',
         choices
       });
 
-      projectConfig = loadProjectConfiguration(projectIdentifier);
-      baseDir = join(process.cwd(), 'projects', projectIdentifier);
+      projectDir = join(projectsDir, selected);
     } else {
       console.error(chalk.red('Error: Project name or --project-dir required in non-interactive mode'));
       process.exit(2);
+    }
+
+    projectConfig = loadProjectFromDirectory(projectDir);
+    if (!projectConfig) {
+      console.error(chalk.red(`Error: No project.json found in ${projectDir}`));
+      process.exit(3);
     }
 
     // Get snapshots
@@ -173,10 +162,10 @@ export const compareCommand = new Command('compare')
     }
 
     // Set up paths
-    const sourceDir = join(baseDir, snapshots[sourceId].directory);
-    const targetDir = join(baseDir, snapshots[targetId].directory);
+    const sourceDir = join(projectDir, snapshots[sourceId].directory);
+    const targetDir = join(projectDir, snapshots[targetId].directory);
     const comparisonId = `${sourceId}--${targetId}`;
-    const outputDir = join(baseDir, 'screenshot-sets', 'comparisons', comparisonId);
+    const outputDir = join(projectDir, 'screenshot-sets', 'comparisons', comparisonId);
 
     if (!existsSync(sourceDir)) {
       console.error(chalk.red(`Error: Source directory not found: ${sourceDir}`));
@@ -214,13 +203,7 @@ export const compareCommand = new Command('compare')
         statistics: result.statistics
       };
 
-      // Save updated config
-      if (projectDir) {
-        saveProjectToDirectory(projectDir, projectConfig);
-      } else {
-        const { saveProjectConfiguration } = await import('../../utils/project-manager.mjs');
-        saveProjectConfiguration(projectConfig);
-      }
+      saveProjectToDirectory(projectDir, projectConfig);
 
       console.log();
       console.log(chalk.green('Comparison completed!'));

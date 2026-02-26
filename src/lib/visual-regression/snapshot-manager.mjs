@@ -3,16 +3,9 @@
  */
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { join, dirname } from 'path';
 import { captureUrlScreenshots, determineOptimalConcurrency } from './screenshot.mjs';
 import { ensureDirectory } from './screenshot-set-manager.mjs';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const rootDir = join(__dirname, '..', '..', '..');
-const projectsDir = join(rootDir, 'projects');
+import { projectsDir } from '../../utils/project-manager.mjs';
 
 /**
  * Create a new snapshot for a project

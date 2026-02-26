@@ -7,8 +7,8 @@ dependencies:
     - rest
     - serialization
     - user
-id: civictheme_site_content
-label: 'CivicTheme Site Content'
+id: visual_regression_site_content
+label: 'Site Content Export'
 module: views
 description: ''
 tag: ''
@@ -265,7 +265,7 @@ display:
       display_extenders:
         simple_sitemap_display_extender:
           variants: {  }
-      path: civictheme-content-export.json
+      path: content-export.json
     cache_metadata:
       max-age: 0
       contexts:

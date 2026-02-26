@@ -145,7 +145,7 @@ Viewport dimensions must be at least 320 pixels for both width and height.
 
 ## Drupal Module: CivicTheme Visual Regression
 
-The `modules/civictheme_visual_regression` directory contains a Drupal module that can be installed on your Drupal site to automatically generate a list of pages for visual regression testing.
+The `modules/visual_regression_content_export` directory contains a Drupal module that can be installed on your Drupal site to automatically generate a list of pages for visual regression testing.
 
 ### GovCMS Module setup locally
 
@@ -159,23 +159,23 @@ Copy to custom module to GovCMS Project containers
       docker cp ./files/custom govcms-<project-name>-php-1:/app/web/modules/ || exit 1
       docker cp ./files/custom govcms-<project-name>-nginx-1:/app/web/modules/ || exit 1
       docker cp ./files/custom <project-name>:/app/web/modules/ || exit 1
-      ahoy drush en civictheme_visual_regression -y
+      ahoy drush en visual_regression_content_export -y
 ```
-Run with `ahoy my civictheme-visual-regression` and then `drush en civictheme_visual_regression`
+Run with `ahoy my civictheme-visual-regression` and then `drush en visual_regression_content_export`
 
 
 
 ### What It Does
 
-The module provides a Views-based REST export at `/civictheme-content-export.json` that returns up to 1000 published nodes (or the total number of nodes if fewer than 1000) in randomized order. Each entry includes:
+The module provides a Views-based REST export at `/content-export.json` that returns up to 1000 published nodes (or the total number of nodes if fewer than 1000) in randomized order. Each entry includes:
 - `title`: The node title
 - `link`: The relative path to the node
 
 ### Installation
 
-1. Copy the `modules/civictheme_visual_regression` directory to your Drupal site's `modules/custom/` directory
-2. Enable the module: `drush en civictheme_visual_regression`
-3. The view will be available immediately at `/civictheme-content-export.json`
+1. Copy the `modules/visual_regression_content_export` directory to your Drupal site's `modules/custom/` directory
+2. Enable the module: `drush en visual_regression_content_export`
+3. The view will be available immediately at `/content-export.json`
 
 ### Usage
 

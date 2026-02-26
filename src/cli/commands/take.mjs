@@ -1,5 +1,5 @@
 /**
- * CLI command: ct-vizdiff take
+ * CLI command: vr-drupal take
  * Take visual regression screenshots
  */
 import { Command } from 'commander';
@@ -11,10 +11,10 @@ import { captureUrlScreenshots, determineOptimalConcurrency } from '../../lib/vi
 import { ensureDirectory } from '../../lib/visual-regression/screenshot-set-manager.mjs';
 import {
   getAllProjects,
-  loadProjectConfiguration,
   loadProjectFromDirectory,
   saveProjectToDirectory,
-  resolveProjectDir
+  resolveProjectDir,
+  projectsDir
 } from '../../utils/project-manager.mjs';
 import {
   setSessionCookies,
@@ -44,29 +44,14 @@ export const takeCommand = new Command('take')
 
     // Determine project source
     if (resolvedProjectDir) {
-      // Load from specified directory
       projectDir = resolve(resolvedProjectDir);
-      projectConfig = loadProjectFromDirectory(projectDir);
-
-      if (!projectConfig) {
-        console.error(chalk.red(`Error: No project.json found in ${projectDir}`));
-        process.exit(3);
-      }
-      projectIdentifier = projectDir;
     } else if (projectArg) {
-      // Load from built-in projects
-      projectConfig = loadProjectConfiguration(projectArg);
-      if (!projectConfig) {
-        console.error(chalk.red(`Error: Project "${projectArg}" not found`));
-        process.exit(3);
-      }
-      projectIdentifier = projectArg;
+      projectDir = join(projectsDir, projectArg);
     } else if (isInteractive) {
-      // Interactive project selection
       const projects = getAllProjects();
 
       if (projects.length === 0) {
-        console.error(chalk.red('No projects found. Create one with: ct-vizdiff init'));
+        console.error(chalk.red('No projects found. Create one with: vr-drupal init'));
         process.exit(3);
       }
 
@@ -76,16 +61,23 @@ export const takeCommand = new Command('take')
         description: `Created: ${new Date(p.createdAt).toLocaleDateString()}`
       }));
 
-      projectIdentifier = await select({
+      const selected = await select({
         message: 'Select a project:',
         choices
       });
 
-      projectConfig = loadProjectConfiguration(projectIdentifier);
+      projectDir = join(projectsDir, selected);
     } else {
       console.error(chalk.red('Error: Project name or --project-dir required in non-interactive mode'));
       process.exit(2);
     }
+
+    projectConfig = loadProjectFromDirectory(projectDir);
+    if (!projectConfig) {
+      console.error(chalk.red(`Error: No project.json found in ${projectDir}`));
+      process.exit(3);
+    }
+    projectIdentifier = projectDir;
 
     // Show existing snapshots
     if (isInteractive && projectConfig.snapshots) {
@@ -117,15 +109,7 @@ export const takeCommand = new Command('take')
     }
 
     // Determine screenshot output directory
-    let snapshotDir;
-    if (projectDir) {
-      // External project - store screenshots relative to project.json
-      snapshotDir = join(projectDir, 'screenshot-sets', 'sets', snapshotId);
-    } else {
-      // Built-in project
-      const rootProjectsDir = join(process.cwd(), 'projects');
-      snapshotDir = join(rootProjectsDir, projectIdentifier, 'screenshot-sets', 'sets', snapshotId);
-    }
+    const snapshotDir = join(projectDir, 'screenshot-sets', 'sets', snapshotId);
 
     // Check if snapshot exists
     if (existsSync(snapshotDir)) {
@@ -223,26 +207,16 @@ export const takeCommand = new Command('take')
       });
 
       // Update project configuration with snapshot info
-      const snapshotInfo = {
-        directory: projectDir
-          ? `screenshot-sets/sets/${snapshotId}`
-          : `screenshot-sets/sets/${snapshotId}`,
+      if (!projectConfig.snapshots) {
+        projectConfig.snapshots = {};
+      }
+      projectConfig.snapshots[snapshotId] = {
+        directory: `screenshot-sets/sets/${snapshotId}`,
         date: new Date().toISOString(),
         count: result.count
       };
 
-      if (!projectConfig.snapshots) {
-        projectConfig.snapshots = {};
-      }
-      projectConfig.snapshots[snapshotId] = snapshotInfo;
-
-      // Save updated config
-      if (projectDir) {
-        saveProjectToDirectory(projectDir, projectConfig);
-      } else {
-        const { saveProjectConfiguration } = await import('../../utils/project-manager.mjs');
-        saveProjectConfiguration(projectConfig);
-      }
+      saveProjectToDirectory(projectDir, projectConfig);
 
       console.log();
       console.log(chalk.green(`Snapshot "${snapshotId}" created successfully!`));

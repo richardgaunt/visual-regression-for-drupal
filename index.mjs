@@ -4,7 +4,7 @@
  */
 import { program } from 'commander';
 import { showMainMenu } from './src/commands/index.mjs';
-import { existsSync, renameSync, rmSync, readFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join, resolve } from 'path';
 import { exec } from 'child_process';
 import { platform } from 'os';
@@ -50,26 +50,6 @@ function openInBrowser(filePath) {
   });
 }
 
-/**
- * Recovers the projects directory if tests were interrupted
- * This ensures the original projects folder is restored if tests
- * failed to complete their cleanup
- */
-function recoverProjectsDirectory() {
-  const projectsDir = join(process.cwd(), 'projects');
-  const backupProjectsDir = join(process.cwd(), 'projects.backup');
-
-  // If backup exists, it means tests were interrupted
-  if (existsSync(backupProjectsDir)) {
-    // Remove any test projects directory that might exist
-    if (existsSync(projectsDir)) {
-      rmSync(projectsDir, { recursive: true, force: true });
-    }
-    // Restore the backup
-    renameSync(backupProjectsDir, projectsDir);
-    console.log('Recovered projects directory from interrupted test run');
-  }
-}
 
 /**
  * Registers all available commands with the Commander program
@@ -77,7 +57,7 @@ function recoverProjectsDirectory() {
  */
 export function registerCommands(prog) {
   prog
-    .name('ct-vizdiff')
+    .name('vr-drupal')
     .version('1.0.0')
     .description('CivicTheme Visual Regression Testing Tool')
     .enablePositionalOptions()
@@ -301,11 +281,11 @@ async function showExternalProjectMenu(projectDir) {
 }
 
 /**
- * Check if a directory contains a valid ct-vizdiff project
+ * Check if a directory contains a valid vr-drupal project
  * @param {string} projectDir - Path to check
- * @returns {boolean} - True if valid ct-vizdiff project
+ * @returns {boolean} - True if valid vr-drupal project
  */
-function isValidCtVizdiffProject(projectDir) {
+function isValidVrDrupalProject(projectDir) {
   const configPath = join(projectDir, 'project.json');
 
   if (!existsSync(configPath)) {
@@ -316,7 +296,7 @@ function isValidCtVizdiffProject(projectDir) {
     const content = readFileSync(configPath, 'utf8');
     const config = JSON.parse(content);
 
-    // Check for ct-vizdiff specific properties
+    // Check for vr-drupal specific properties
     return config && config['visual-diff'] && config.name;
   } catch {
     return false;
@@ -324,22 +304,32 @@ function isValidCtVizdiffProject(projectDir) {
 }
 
 /**
- * Detect a ct-vizdiff project in the current directory
- * Checks ./project.json and ./visual-regression/project.json
+ * Detect a vr-drupal project in the current directory
+ * Checks ./project.json and scans .visual-regression/ for projects
  * @returns {string|null} - Path to project directory or null
  */
 function detectProjectInCurrentDirectory() {
   const cwd = process.cwd();
 
   // Check current directory for project.json
-  if (isValidCtVizdiffProject(cwd)) {
+  if (isValidVrDrupalProject(cwd)) {
     return cwd;
   }
 
-  // Check ./visual-regression for project.json
-  const visualRegressionDir = join(cwd, 'visual-regression');
-  if (isValidCtVizdiffProject(visualRegressionDir)) {
-    return visualRegressionDir;
+  // Scan .visual-regression/ for projects
+  const vrDir = join(cwd, '.visual-regression');
+  if (existsSync(vrDir)) {
+    try {
+      const dirs = readdirSync(vrDir, { withFileTypes: true })
+        .filter(d => d.isDirectory() && isValidVrDrupalProject(join(vrDir, d.name)));
+
+      if (dirs.length === 1) {
+        return join(vrDir, dirs[0].name);
+      }
+      // If multiple projects, return null (fall through to main menu)
+    } catch {
+      // ignore
+    }
   }
 
   return null;
@@ -349,9 +339,6 @@ function detectProjectInCurrentDirectory() {
  * Main entry point for the CLI application
  */
 export async function main() {
-  // Recover projects directory if needed (in case tests were interrupted)
-  recoverProjectsDirectory();
-
   // Check for --project-dir without a subcommand (interactive mode with external project)
   const projectDirIndex = process.argv.indexOf('--project-dir');
   const hasSubcommand = process.argv.some((arg, index) =>

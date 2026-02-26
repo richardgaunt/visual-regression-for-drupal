@@ -1,6 +1,6 @@
 # CivicTheme Visual Regression CLI Commands
 
-This document describes all available CLI commands for the `ct-vizdiff` tool. These commands enable visual regression testing workflows for CivicTheme websites.
+This document describes all available CLI commands for the `vr-drupal` tool. These commands enable visual regression testing workflows for CivicTheme websites.
 
 ## Installation
 
@@ -12,25 +12,25 @@ npm install -g .
 npm link
 ```
 
-After installation, the `ct-vizdiff` command is available globally.
+After installation, the `vr-drupal` command is available globally.
 
 ## Command Overview
 
 | Command | Purpose |
 |---------|---------|
-| `ct-vizdiff` | Launch interactive menu (no arguments) |
-| `ct-vizdiff init` | Initialize a new visual regression project |
-| `ct-vizdiff take` | Take visual regression screenshots |
-| `ct-vizdiff compare` | Compare two snapshot sets |
-| `ct-vizdiff list` | List all projects |
-| `ct-vizdiff show` | Show project details |
-| `ct-vizdiff delete` | Delete projects, snapshots, or comparisons |
+| `vr-drupal` | Launch interactive menu (no arguments) |
+| `vr-drupal init` | Initialize a new visual regression project |
+| `vr-drupal take` | Take visual regression screenshots |
+| `vr-drupal compare` | Compare two snapshot sets |
+| `vr-drupal list` | List all projects |
+| `vr-drupal show` | Show project details |
+| `vr-drupal delete` | Delete projects, snapshots, or comparisons |
 
 ---
 
 ## Global Options
 
-These options apply to the main `ct-vizdiff` command:
+These options apply to the main `vr-drupal` command:
 
 | Option | Description |
 |--------|-------------|
@@ -42,21 +42,21 @@ These options apply to the main `ct-vizdiff` command:
 
 ```bash
 # Launch interactive menu for a specific project directory
-ct-vizdiff --project-dir ./visual-regression
+vr-drupal --project-dir ./visual-regression
 ```
 
 This loads the project from the specified directory and shows an interactive menu to take snapshots or compare them.
 
 ---
 
-## ct-vizdiff init
+## vr-drupal init
 
 Initialize a new visual regression project. Creates a `project.json` configuration file.
 
 ### Usage
 
 ```bash
-ct-vizdiff init [options]
+vr-drupal init [options]
 ```
 
 ### Options
@@ -75,10 +75,10 @@ ct-vizdiff init [options]
 
 ```bash
 # Interactive mode - prompts for all options
-ct-vizdiff init
+vr-drupal init
 
 # Non-interactive with all options
-ct-vizdiff init \
+vr-drupal init \
   --name "My Project" \
   --url https://example.com \
   --paths /,/about,/contact \
@@ -87,7 +87,7 @@ ct-vizdiff init \
   --no-interactive
 
 # Auto-detect paths from CivicTheme
-ct-vizdiff init \
+vr-drupal init \
   --name "CivicTheme Site" \
   --url https://civictheme.example.com \
   --detect-paths \
@@ -103,14 +103,14 @@ Creates `project.json` in the specified output directory with:
 
 ---
 
-## ct-vizdiff take
+## vr-drupal take
 
 Take visual regression screenshots for a project.
 
 ### Usage
 
 ```bash
-ct-vizdiff take [project] [options]
+vr-drupal take [project] [options]
 ```
 
 ### Arguments
@@ -136,16 +136,16 @@ ct-vizdiff take [project] [options]
 
 ```bash
 # Interactive - select project and options
-ct-vizdiff take
+vr-drupal take
 
 # Take snapshot for built-in project
-ct-vizdiff take my-project --id before-update
+vr-drupal take my-project --id before-update
 
 # Take snapshot for external project
-ct-vizdiff take --project-dir ./visual-regression --id baseline
+vr-drupal take --project-dir ./visual-regression --id baseline
 
 # With basic authentication
-ct-vizdiff take \
+vr-drupal take \
   --project-dir ./visual-regression \
   --id authenticated-snapshot \
   --auth-type basic \
@@ -153,13 +153,13 @@ ct-vizdiff take \
   --password secret
 
 # With session cookies
-ct-vizdiff take \
+vr-drupal take \
   --project-dir ./visual-regression \
   --id session-snapshot \
   --cookies "SESS123=abc123; token=xyz789"
 
 # Non-interactive for CI/CD
-ct-vizdiff take \
+vr-drupal take \
   --project-dir ./visual-regression \
   --id ci-snapshot-$BUILD_NUMBER \
   --no-interactive
@@ -173,14 +173,14 @@ ct-vizdiff take \
 
 ---
 
-## ct-vizdiff compare
+## vr-drupal compare
 
 Compare two snapshot sets and generate a visual diff report.
 
 ### Usage
 
 ```bash
-ct-vizdiff compare [project] [options]
+vr-drupal compare [project] [options]
 ```
 
 ### Arguments
@@ -204,26 +204,26 @@ ct-vizdiff compare [project] [options]
 
 ```bash
 # Interactive - select project and snapshots
-ct-vizdiff compare
+vr-drupal compare
 
 # Compare specific snapshots for built-in project
-ct-vizdiff compare my-project --source before --target after
+vr-drupal compare my-project --source before --target after
 
 # Compare for external project
-ct-vizdiff compare \
+vr-drupal compare \
   --project-dir ./visual-regression \
   --source baseline \
   --target current
 
 # Compare and open report
-ct-vizdiff compare \
+vr-drupal compare \
   --project-dir ./visual-regression \
   --source baseline \
   --target current \
   --open
 
 # JSON output for scripting
-ct-vizdiff compare \
+vr-drupal compare \
   --project-dir ./visual-regression \
   --source baseline \
   --target current \
@@ -252,14 +252,14 @@ ct-vizdiff compare \
 
 ---
 
-## ct-vizdiff list
+## vr-drupal list
 
 List all visual regression projects.
 
 ### Usage
 
 ```bash
-ct-vizdiff list [options]
+vr-drupal list [options]
 ```
 
 ### Options
@@ -272,10 +272,10 @@ ct-vizdiff list [options]
 
 ```bash
 # List all projects in table format
-ct-vizdiff list
+vr-drupal list
 
 # List all projects in JSON format
-ct-vizdiff list --format json
+vr-drupal list --format json
 ```
 
 ### Output (Table)
@@ -313,14 +313,14 @@ My Project
 
 ---
 
-## ct-vizdiff show
+## vr-drupal show
 
 Show detailed information about a project.
 
 ### Usage
 
 ```bash
-ct-vizdiff show [project] [options]
+vr-drupal show [project] [options]
 ```
 
 ### Arguments
@@ -343,25 +343,25 @@ ct-vizdiff show [project] [options]
 
 ```bash
 # Show all details for a project
-ct-vizdiff show my-project
+vr-drupal show my-project
 
 # Show project from external directory
-ct-vizdiff show --project-dir ./visual-regression
+vr-drupal show --project-dir ./visual-regression
 
 # Show only snapshots
-ct-vizdiff show my-project --snapshots
+vr-drupal show my-project --snapshots
 
 # Show only comparisons
-ct-vizdiff show my-project --comparisons
+vr-drupal show my-project --comparisons
 
 # Show only configuration
-ct-vizdiff show my-project --config
+vr-drupal show my-project --config
 
 # JSON output
-ct-vizdiff show my-project --format json
+vr-drupal show my-project --format json
 
 # JSON output of snapshots only
-ct-vizdiff show my-project --snapshots --format json
+vr-drupal show my-project --snapshots --format json
 ```
 
 ### Output
@@ -405,14 +405,14 @@ Comparisons (2):
 
 ---
 
-## ct-vizdiff delete
+## vr-drupal delete
 
 Delete a project, snapshot, or comparison.
 
 ### Usage
 
 ```bash
-ct-vizdiff delete [project] [options]
+vr-drupal delete [project] [options]
 ```
 
 ### Arguments
@@ -435,25 +435,25 @@ ct-vizdiff delete [project] [options]
 
 ```bash
 # Interactive - select project to delete
-ct-vizdiff delete
+vr-drupal delete
 
 # Delete entire project (with confirmation)
-ct-vizdiff delete my-project
+vr-drupal delete my-project
 
 # Delete project without confirmation
-ct-vizdiff delete my-project --force
+vr-drupal delete my-project --force
 
 # Delete specific snapshot
-ct-vizdiff delete my-project --snapshot old-snapshot
+vr-drupal delete my-project --snapshot old-snapshot
 
 # Delete specific comparison
-ct-vizdiff delete my-project --comparison baseline--old
+vr-drupal delete my-project --comparison baseline--old
 
 # Delete from external project directory
-ct-vizdiff delete --project-dir ./visual-regression --snapshot outdated
+vr-drupal delete --project-dir ./visual-regression --snapshot outdated
 
 # Non-interactive deletion
-ct-vizdiff delete \
+vr-drupal delete \
   --project-dir ./visual-regression \
   --snapshot old-snapshot \
   --force \
@@ -489,19 +489,19 @@ ct-vizdiff delete \
 
 | Variable | Description |
 |----------|-------------|
-| `CT_VIZDIFF_PROJECT_DIR` | Default project directory for `--project-dir` option |
-| `CT_VIZDIFF_PROJECTS_DIR` | Override default location for built-in projects (used for testing) |
+| `VR_DRUPAL_PROJECT_DIR` | Default project directory for `--project-dir` option |
+| `VR_DRUPAL_PROJECTS_DIR` | Override default location for built-in projects (used for testing) |
 
 ### Using Environment Variables
 
 ```bash
 # Set default project directory
-export CT_VIZDIFF_PROJECT_DIR=./visual-regression
+export VR_DRUPAL_PROJECT_DIR=./visual-regression
 
 # Now all commands use this directory without needing --project-dir
-ct-vizdiff take --id baseline
-ct-vizdiff compare --source baseline --target current
-ct-vizdiff show
+vr-drupal take --id baseline
+vr-drupal compare --source baseline --target current
+vr-drupal show
 ```
 
 ---
@@ -512,7 +512,7 @@ For automated pipelines, use `--no-interactive` to ensure commands fail rather t
 
 ```bash
 # Initialize project
-ct-vizdiff init \
+vr-drupal init \
   --name "CI Project" \
   --url $SITE_URL \
   --detect-paths \
@@ -520,19 +520,19 @@ ct-vizdiff init \
   --no-interactive
 
 # Take baseline screenshot
-ct-vizdiff take \
+vr-drupal take \
   --project-dir ./visual-regression \
   --id baseline-$CI_COMMIT_SHA \
   --no-interactive
 
 # Take comparison screenshot
-ct-vizdiff take \
+vr-drupal take \
   --project-dir ./visual-regression \
   --id pr-$CI_MERGE_REQUEST_IID \
   --no-interactive
 
 # Compare and get JSON result
-RESULT=$(ct-vizdiff compare \
+RESULT=$(vr-drupal compare \
   --project-dir ./visual-regression \
   --source baseline-$CI_COMMIT_SHA \
   --target pr-$CI_MERGE_REQUEST_IID \

@@ -80,14 +80,14 @@ jobs:
         if: steps.download-baseline.outputs.has_baseline == 'true'
         run: |
           cd {{PROJECT_DIR}}
-          {{CT_VIZDIFF_CMD}} take --project-dir . --id current --overwrite --no-interactive
+          {{VR_DRUPAL_CMD}} take --project-dir . --id current --overwrite --no-interactive
 
       - name: Compare screenshots
         if: steps.download-baseline.outputs.has_baseline == 'true'
         id: compare
         run: |
           cd {{PROJECT_DIR}}
-          {{CT_VIZDIFF_CMD}} compare --project-dir . --source baseline --target current --no-interactive || true
+          {{VR_DRUPAL_CMD}} compare --project-dir . --source baseline --target current --no-interactive || true
 
           # Read results from reg.json
           COMPARISON_DIR="screenshot-sets/comparisons/baseline--current"
@@ -145,7 +145,7 @@ jobs:
 
             Download the comparison report artifact for full details.
 
-            <!-- ct-vizdiff-comment -->`;
+            <!-- vr-drupal-comment -->`;
 
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
@@ -154,7 +154,7 @@ jobs:
               issue_number: context.issue.number
             });
 
-            const existingComment = comments.find(c => c.body.includes('<!-- ct-vizdiff-comment -->'));
+            const existingComment = comments.find(c => c.body.includes('<!-- vr-drupal-comment -->'));
 
             if (existingComment) {
               await github.rest.issues.updateComment({
@@ -185,7 +185,7 @@ jobs:
             1. Push to the target branch to trigger the baseline workflow
             2. Manually run the "Visual Regression - Baseline Screenshots" workflow
 
-            <!-- ct-vizdiff-comment -->`;
+            <!-- vr-drupal-comment -->`;
 
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
@@ -193,7 +193,7 @@ jobs:
               issue_number: context.issue.number
             });
 
-            const existingComment = comments.find(c => c.body.includes('<!-- ct-vizdiff-comment -->'));
+            const existingComment = comments.find(c => c.body.includes('<!-- vr-drupal-comment -->'));
 
             if (existingComment) {
               await github.rest.issues.updateComment({

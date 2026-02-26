@@ -2,15 +2,12 @@
  * Project manager utilities for managing CivicTheme update projects
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { validateProjectConfiguration, formatValidationErrors } from './validator.mjs';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+export const DEFAULT_PROJECT_DIR_NAME = '.visual-regression';
 
-const rootDir = join(__dirname, '..', '..');
-const projectsDir = process.env.CT_VIZDIFF_PROJECTS_DIR || join(rootDir, 'projects');
+export const projectsDir = process.env.VR_DRUPAL_PROJECTS_DIR || join(process.cwd(), DEFAULT_PROJECT_DIR_NAME);
 
 /**
  * Convert a human-readable project name to a valid directory name
@@ -224,14 +221,15 @@ export function saveProjectToDirectory(projectDir, config) {
 
 /**
  * Get the project directory from environment variable or default
- * @returns {string|null} - The project directory from CT_VIZDIFF_PROJECT_DIR or null
+ * @returns {string|null} - The project directory from VR_DRUPAL_PROJECT_DIR or null
  */
 export function getProjectDirFromEnv() {
-  return process.env.CT_VIZDIFF_PROJECT_DIR || null;
+  return process.env.VR_DRUPAL_PROJECT_DIR || null;
 }
 
 /**
- * Resolve project directory from options, environment, or default
+ * Resolve project directory from options, environment, or auto-discovery
+ * Priority: 1. --project-dir flag, 2. VR_DRUPAL_PROJECT_DIR env, 3. Auto-discover single project in .visual-regression/
  * @param {Object} options - Command options with projectDir property
  * @returns {string|null} - Resolved project directory or null
  */
@@ -239,7 +237,26 @@ export function resolveProjectDir(options) {
   if (options?.projectDir) {
     return options.projectDir;
   }
-  return getProjectDirFromEnv();
+
+  const envDir = getProjectDirFromEnv();
+  if (envDir) {
+    return envDir;
+  }
+
+  // Auto-discover: if exactly one project in .visual-regression/, use it
+  if (existsSync(projectsDir)) {
+    try {
+      const dirs = readdirSync(projectsDir, { withFileTypes: true })
+        .filter(d => d.isDirectory() && existsSync(join(projectsDir, d.name, 'project.json')));
+      if (dirs.length === 1) {
+        return join(projectsDir, dirs[0].name);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return null;
 }
 
 /**

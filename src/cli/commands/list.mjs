@@ -1,5 +1,5 @@
 /**
- * CLI command: ct-vizdiff list
+ * CLI command: vr-drupal list
  * List all visual regression projects
  */
 import { Command } from 'commander';
@@ -13,8 +13,8 @@ export const listCommand = new Command('list')
     const projects = getAllProjects();
 
     if (projects.length === 0) {
-      console.log(chalk.yellow('No projects found.'));
-      console.log(chalk.cyan('Create one with: ct-vizdiff init'));
+      console.log(chalk.yellow('No projects found in .visual-regression/.'));
+      console.log(chalk.cyan('Create one with: vr-drupal init'));
       return;
     }
 

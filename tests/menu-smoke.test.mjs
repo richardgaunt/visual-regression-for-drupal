@@ -112,7 +112,7 @@ describe('Menu Smoke Tests', () => {
 
   beforeAll(() => {
     // Set environment variable so project-manager uses test directory
-    process.env.CT_VIZDIFF_PROJECTS_DIR = testProjectsDir;
+    process.env.VR_DRUPAL_PROJECTS_DIR = testProjectsDir;
 
     // Clean up any existing test projects directory
     if (existsSync(testProjectsDir)) {
@@ -138,7 +138,7 @@ describe('Menu Smoke Tests', () => {
     }
 
     // Clean up environment variable
-    delete process.env.CT_VIZDIFF_PROJECTS_DIR;
+    delete process.env.VR_DRUPAL_PROJECTS_DIR;
   });
 
   describe('Main Menu Display', () => {

@@ -5,7 +5,7 @@ import chalk from 'chalk';
 import { input, confirm, checkbox } from '@inquirer/prompts';
 import { VIEWPORT_PRESETS, isValidUrl, getUrlValidationError, DEFAULT_PATHS } from './config.mjs';
 
-const CIVICTHEME_CONTENT_EXPORT_PATH = '/civictheme-content-export.json';
+const CIVICTHEME_CONTENT_EXPORT_PATH = '/content-export.json';
 
 /**
  * Fetch CivicTheme content export JSON from a site
@@ -76,7 +76,7 @@ async function promptForCivicThemePaths(baseUrl) {
   console.log('CivicTheme Visual Regression has a companion module that can be installed');
   console.log('on the Drupal website where you want to carry out the visual regression.');
   console.log();
-  console.log(`This module is located at ${chalk.cyan(process.cwd() + '/modules/civictheme_visual_regression')}`);
+  console.log(`This module is located at ${chalk.cyan(process.cwd() + '/modules/visual_regression_content_export')}`);
   console.log('- copy this file to your Drupal installation module directory and enable.');
   console.log();
   console.log('If you wish, load this module now.');

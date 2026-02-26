@@ -1,11 +1,11 @@
 {
-  "name": "civictheme-update-helper",
+  "name": "@richardgaunt/visual-regression-for-drupal",
   "version": "1.0.0",
-  "description": "Tool to assist with updating CivicTheme between versions",
+  "description": "Visual regression package designed for running visual regression for CivicTheme but can be configured for other Drupal theme's and websites in general.",
   "main": "index.mjs",
   "type": "module",
   "bin": {
-    "ct-vizdiff": "index.mjs"
+    "vr-drupal": "index.mjs"
   },
   "scripts": {
     "start": "node index.mjs",

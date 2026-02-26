@@ -1,5 +1,5 @@
 /**
- * CLI command: ct-vizdiff init
+ * CLI command: vr-drupal init
  * Initialize a new visual regression project
  */
 import { Command } from 'commander';
@@ -9,6 +9,7 @@ import { join, resolve } from 'path';
 import { input, confirm, checkbox } from '@inquirer/prompts';
 import { VIEWPORT_PRESETS, DEFAULT_PATHS, isValidUrl } from '../../lib/visual-regression/config.mjs';
 import { validateProjectConfiguration } from '../../utils/validator.mjs';
+import { DEFAULT_PROJECT_DIR_NAME } from '../../utils/project-manager.mjs';
 
 /**
  * Fetch CivicTheme content export JSON from a site
@@ -16,7 +17,7 @@ import { validateProjectConfiguration } from '../../utils/validator.mjs';
  * @returns {Promise<string[]|null>} - Array of paths or null if not found
  */
 async function fetchCivicThemeContentExport(baseUrl) {
-  const exportUrl = baseUrl.replace(/\/$/, '') + '/civictheme-content-export.json';
+  const exportUrl = baseUrl.replace(/\/$/, '') + '/content-export.json';
 
   try {
     const response = await fetch(exportUrl);
@@ -86,20 +87,48 @@ export const initCommand = new Command('init')
   .option('--url <url>', 'Base URL to screenshot')
   .option('--paths <paths>', 'Comma-separated paths to screenshot')
   .option('--viewports <viewports>', 'Viewport presets: mobile,tablet,desktop')
-  .option('--output-dir <dir>', 'Output directory', './visual-regression')
+  .option('--project-root <dir>', 'Project root directory (output will be <root>/.visual-regression/<name>/)')
+  .option('--output-dir <dir>', 'Output directory (overrides --project-root)')
   .option('--detect-paths', 'Auto-detect paths from CivicTheme export')
   .option('--no-interactive', 'Run non-interactively (fail if required options missing)')
   .action(async (options) => {
     const isInteractive = options.interactive !== false;
 
-    // Resolve output directory
-    let outputDir = resolve(options.outputDir);
+    // We need the project name early to compute the output directory
+    // Get project name first (before resolving output directory)
+    let projectName = options.name;
+    if (!projectName) {
+      if (isInteractive) {
+        projectName = await input({
+          message: 'Enter project name:',
+          validate: (value) => value.trim() ? true : 'Project name is required'
+        });
+      } else {
+        console.error(chalk.red('Error: --name is required in non-interactive mode'));
+        process.exit(2);
+      }
+    }
 
-    if (isInteractive && !options.outputDir) {
-      outputDir = resolve(await input({
-        message: 'Enter output directory:',
-        default: './visual-regression'
-      }));
+    const directoryName = convertToDirectoryName(projectName);
+
+    // Resolve output directory
+    let outputDir;
+
+    if (options.outputDir) {
+      // Explicit --output-dir takes highest priority
+      outputDir = resolve(options.outputDir);
+    } else if (options.projectRoot) {
+      // --project-root: output to <root>/.visual-regression/<name>/
+      outputDir = resolve(options.projectRoot, DEFAULT_PROJECT_DIR_NAME, directoryName);
+    } else if (isInteractive) {
+      const projectRoot = await input({
+        message: 'Enter project root directory:',
+        default: '.'
+      });
+      outputDir = resolve(projectRoot, DEFAULT_PROJECT_DIR_NAME, directoryName);
+    } else {
+      // Non-interactive without explicit dir: default to ./.visual-regression/<name>/
+      outputDir = resolve(DEFAULT_PROJECT_DIR_NAME, directoryName);
     }
 
     // Check if project.json already exists
@@ -120,19 +149,7 @@ export const initCommand = new Command('init')
       }
     }
 
-    // Get project name
-    let projectName = options.name;
-    if (!projectName) {
-      if (isInteractive) {
-        projectName = await input({
-          message: 'Enter project name:',
-          validate: (value) => value.trim() ? true : 'Project name is required'
-        });
-      } else {
-        console.error(chalk.red('Error: --name is required in non-interactive mode'));
-        process.exit(2);
-      }
-    }
+    // projectName was already resolved above (needed for directory computation)
 
     // Get base URL
     let baseUrl = options.url;
@@ -223,7 +240,6 @@ export const initCommand = new Command('init')
     }
 
     // Create configuration
-    const directoryName = convertToDirectoryName(projectName);
     const now = new Date().toISOString();
 
     const config = {
@@ -290,5 +306,5 @@ screenshot-sets/comparisons/*
     console.log(chalk.cyan(`  Config: ${configPath}`));
     console.log();
     console.log(chalk.yellow('Next steps:'));
-    console.log(chalk.white(`  ct-vizdiff take --project-dir ${options.outputDir}`));
+    console.log(chalk.white(`  vr-drupal take`));
   });

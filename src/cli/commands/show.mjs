@@ -1,16 +1,16 @@
 /**
- * CLI command: ct-vizdiff show
+ * CLI command: vr-drupal show
  * Show details of a visual regression project
  */
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { resolve } from 'path';
+import { join, resolve } from 'path';
 import { select } from '@inquirer/prompts';
 import {
   getAllProjects,
-  loadProjectConfiguration,
   loadProjectFromDirectory,
-  resolveProjectDir
+  resolveProjectDir,
+  projectsDir
 } from '../../utils/project-manager.mjs';
 
 export const showCommand = new Command('show')
@@ -28,26 +28,17 @@ export const showCommand = new Command('show')
     const resolvedProjectDir = resolveProjectDir(options);
 
     // Determine project source
+    let projectDir;
     if (resolvedProjectDir) {
-      const projectDir = resolve(resolvedProjectDir);
-      projectConfig = loadProjectFromDirectory(projectDir);
-
-      if (!projectConfig) {
-        console.error(chalk.red(`Error: No project.json found in ${projectDir}`));
-        process.exit(3);
-      }
+      projectDir = resolve(resolvedProjectDir);
     } else if (projectArg) {
-      projectConfig = loadProjectConfiguration(projectArg);
-      if (!projectConfig) {
-        console.error(chalk.red(`Error: Project "${projectArg}" not found`));
-        process.exit(3);
-      }
+      projectDir = join(projectsDir, projectArg);
     } else {
       // Interactive selection
       const projects = getAllProjects();
 
       if (projects.length === 0) {
-        console.error(chalk.red('No projects found. Create one with: ct-vizdiff init'));
+        console.error(chalk.red('No projects found. Create one with: vr-drupal init'));
         process.exit(3);
       }
 
@@ -61,7 +52,13 @@ export const showCommand = new Command('show')
         choices
       });
 
-      projectConfig = loadProjectConfiguration(selected);
+      projectDir = join(projectsDir, selected);
+    }
+
+    projectConfig = loadProjectFromDirectory(projectDir);
+    if (!projectConfig) {
+      console.error(chalk.red(`Error: No project.json found in ${projectDir}`));
+      process.exit(3);
     }
 
     // JSON output
