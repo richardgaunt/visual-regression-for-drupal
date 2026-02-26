@@ -1,0 +1,37 @@
+# Tests
+tests/
+coverage/
+jest.config.*
+
+# Documentation and tickets
+tickets/
+docs/
+
+# Drupal module (install separately)
+modules/
+
+# Project data
+projects/
+.test-projects/
+reports/
+
+# IDE and editor config
+.vscode/
+.idea/
+*.code-workspace
+
+# CI/CD
+.github/
+
+# Environment and config
+.env
+.env.*
+.eslintcache
+eslint.config.*
+
+# OS files
+.DS_Store
+
+# Misc
+.backup
+civictheme-data/
