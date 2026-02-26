@@ -1,0 +1,36 @@
+name: Visual Regression - Baseline Screenshots
+
+on:
+  push:
+    branches:
+{{BASELINE_BRANCHES}}
+  workflow_dispatch:
+
+jobs:
+  baseline:
+    name: Take Baseline Screenshots
+{{NEEDS_SECTION}}    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '{{NODE_VERSION}}'
+
+      - name: Install dependencies
+        run: {{INSTALL_COMMAND}}
+
+{{AUTH_SECTION_BASELINE}}
+      - name: Take baseline screenshots
+        run: |
+          cd {{PROJECT_DIR}}
+          {{CT_VIZDIFF_CMD}} take --project-dir . --id baseline --overwrite --no-interactive
+
+      - name: Upload baseline artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vr-baseline-${{ github.ref_name }}
+          path: {{PROJECT_DIR}}/screenshot-sets/sets/baseline/
+          retention-days: {{ARTIFACT_RETENTION}}

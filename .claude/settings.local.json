@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ct-vizdiff init:*)",
+      "Bash(ct-vizdiff *)",
+      "Bash(ct-vizdiff list:*)",
+      "Bash(ct-vizdiff show:*)",
+      "Bash(npm run test)",
+      "Bash(node:*)",
+      "Bash(CT_VIZDIFF_PROJECT_DIR=./projects/nationalredress node index.mjs:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}
