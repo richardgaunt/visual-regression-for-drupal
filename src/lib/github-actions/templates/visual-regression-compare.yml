@@ -1,0 +1,212 @@
+name: Visual Regression - Compare Screenshots
+
+on:
+  pull_request:
+    branches:
+{{PR_BRANCHES}}
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  compare:
+    name: Compare Visual Regression Screenshots
+{{NEEDS_SECTION}}    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '{{NODE_VERSION}}'
+
+      - name: Install dependencies
+        run: {{INSTALL_COMMAND}}
+
+{{AUTH_SECTION_COMPARE}}
+      - name: Download baseline artifact
+        id: download-baseline
+        run: |
+          cd {{PROJECT_DIR}}
+          mkdir -p screenshot-sets/sets/baseline
+
+          # Find the most recent baseline artifact for the target branch
+          ARTIFACT_NAME="vr-baseline-${{ github.base_ref }}"
+
+          # Use gh CLI to download the artifact
+          ARTIFACT_ID=$(gh api \
+            "repos/${{ github.repository }}/actions/artifacts?name=${ARTIFACT_NAME}&per_page=1" \
+            --jq '.artifacts[0].id // empty')
+
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "has_baseline=false" >> "$GITHUB_OUTPUT"
+            echo "No baseline artifact found for branch: ${{ github.base_ref }}"
+            echo "Run the baseline workflow on the target branch first."
+            exit 0
+          fi
+
+          gh api \
+            "repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            > baseline.zip
+
+          unzip -o baseline.zip -d screenshot-sets/sets/baseline/
+          rm baseline.zip
+
+          echo "has_baseline=true" >> "$GITHUB_OUTPUT"
+          echo "Downloaded baseline artifact: ${ARTIFACT_NAME} (ID: ${ARTIFACT_ID})"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Register baseline in project.json
+        if: steps.download-baseline.outputs.has_baseline == 'true'
+        run: |
+          cd {{PROJECT_DIR}}
+
+          # Count screenshots in baseline
+          SCREENSHOT_COUNT=$(find screenshot-sets/sets/baseline -name "*.png" | wc -l)
+
+          # Add baseline snapshot entry to project.json
+          jq --arg count "$SCREENSHOT_COUNT" \
+            '.snapshots.baseline = {
+              "directory": "screenshot-sets/sets/baseline",
+              "date": (now | todate),
+              "count": ($count | tonumber)
+            }' project.json > project.json.tmp && mv project.json.tmp project.json
+
+      - name: Take current screenshots
+        if: steps.download-baseline.outputs.has_baseline == 'true'
+        run: |
+          cd {{PROJECT_DIR}}
+          {{CT_VIZDIFF_CMD}} take --project-dir . --id current --overwrite --no-interactive
+
+      - name: Compare screenshots
+        if: steps.download-baseline.outputs.has_baseline == 'true'
+        id: compare
+        run: |
+          cd {{PROJECT_DIR}}
+          {{CT_VIZDIFF_CMD}} compare --project-dir . --source baseline --target current --no-interactive || true
+
+          # Read results from reg.json
+          COMPARISON_DIR="screenshot-sets/comparisons/baseline--current"
+          if [ -f "${COMPARISON_DIR}/reg.json" ]; then
+            TOTAL=$(jq '.total // 0' "${COMPARISON_DIR}/reg.json")
+            PASSED=$(jq '.passed // 0' "${COMPARISON_DIR}/reg.json")
+            CHANGED=$(jq '.changed // 0' "${COMPARISON_DIR}/reg.json")
+            NEW=$(jq '.new // 0' "${COMPARISON_DIR}/reg.json")
+            DELETED=$(jq '.deleted // 0' "${COMPARISON_DIR}/reg.json")
+
+            echo "total=${TOTAL}" >> "$GITHUB_OUTPUT"
+            echo "passed=${PASSED}" >> "$GITHUB_OUTPUT"
+            echo "changed=${CHANGED}" >> "$GITHUB_OUTPUT"
+            echo "new=${NEW}" >> "$GITHUB_OUTPUT"
+            echo "deleted=${DELETED}" >> "$GITHUB_OUTPUT"
+            echo "has_results=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_results=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload comparison report
+        if: steps.download-baseline.outputs.has_baseline == 'true' && steps.compare.outputs.has_results == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vr-comparison-report-pr-${{ github.event.pull_request.number }}
+          path: {{PROJECT_DIR}}/screenshot-sets/comparisons/baseline--current/
+          retention-days: {{REPORT_RETENTION}}
+
+      - name: Comment on PR with results
+        if: steps.download-baseline.outputs.has_baseline == 'true' && steps.compare.outputs.has_results == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const total = '${{ steps.compare.outputs.total }}';
+            const passed = '${{ steps.compare.outputs.passed }}';
+            const changed = '${{ steps.compare.outputs.changed }}';
+            const newCount = '${{ steps.compare.outputs.new }}';
+            const deleted = '${{ steps.compare.outputs.deleted }}';
+
+            const hasChanges = parseInt(changed) > 0 || parseInt(newCount) > 0 || parseInt(deleted) > 0;
+            const statusIcon = hasChanges ? ':warning:' : ':white_check_mark:';
+            const statusText = hasChanges ? 'Visual changes detected' : 'No visual changes';
+
+            const body = `## ${statusIcon} Visual Regression Results
+
+            | Metric | Count |
+            |--------|-------|
+            | Total | ${total} |
+            | Passed | ${passed} |
+            | Changed | ${changed} |
+            | New | ${newCount} |
+            | Deleted | ${deleted} |
+
+            **Status:** ${statusText}
+
+            Download the comparison report artifact for full details.
+
+            <!-- ct-vizdiff-comment -->`;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            const existingComment = comments.find(c => c.body.includes('<!-- ct-vizdiff-comment -->'));
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body
+              });
+            }
+
+      - name: Comment on PR - no baseline
+        if: steps.download-baseline.outputs.has_baseline == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## :information_source: Visual Regression - No Baseline Found
+
+            No baseline screenshots were found for the target branch (\`${{ github.base_ref }}\`).
+
+            To create a baseline, either:
+            1. Push to the target branch to trigger the baseline workflow
+            2. Manually run the "Visual Regression - Baseline Screenshots" workflow
+
+            <!-- ct-vizdiff-comment -->`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+
+            const existingComment = comments.find(c => c.body.includes('<!-- ct-vizdiff-comment -->'));
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body
+              });
+            }
