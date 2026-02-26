@@ -1,6 +1,6 @@
 # Visual Regression for Drupal
 
-[![Test Suite](https://github.com/salsadigitalauorg/civictheme-visual-regression/actions/workflows/test.yml/badge.svg)](https://github.com/salsadigitalauorg/civictheme-visual-regression/actions/workflows/test.yml)
+[![Test Suite](https://github.com/richardgaunt/visual-regression-for-drupal/actions/workflows/test.yml/badge.svg)](https://github.com/richardgaunt/visual-regression-for-drupal/actions/workflows/test.yml)
 
 Visual regression package designed for running visual regression for CivicTheme but can be configured for other Drupal theme's and websites in general.
 
