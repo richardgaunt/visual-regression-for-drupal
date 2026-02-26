@@ -24,7 +24,7 @@
     "commander": "^13.1.0",
     "fs-extra": "^11.3.0",
     "glob": "^11.0.3",
-    "inquirer-file-selector": "^0.6.2",
+    "inquirer-file-selector": "^1.0.1",
     "js-yaml": "^4.1.0",
     "puppeteer": "^22.5.0",
     "puppeteer-cluster": "^0.24.0",
