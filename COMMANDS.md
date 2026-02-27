@@ -199,6 +199,7 @@ vr-drupal compare [project] [options]
 | `--source <id>` | Source (before) snapshot ID | (prompted) |
 | `--target <id>` | Target (after) snapshot ID | (prompted) |
 | `--open` | Open report in browser after comparison | false |
+| `--aggregate-screenshots` | Copy screenshot sets into comparison directory for self-contained static hosting | false |
 | `--output-format <format>` | Output format: html, json | html |
 | `--no-interactive` | Run non-interactively | false |
 
@@ -217,6 +218,13 @@ vr-drupal compare my-site \
   --target current \
   --open
 
+# Self-contained report for uploading to static hosting (Netlify, S3, etc.)
+vr-drupal compare my-site \
+  --source baseline \
+  --target current \
+  --aggregate-screenshots \
+  --no-interactive
+
 # JSON output for scripting
 vr-drupal compare my-site \
   --source baseline \
@@ -231,6 +239,28 @@ vr-drupal compare my-site \
 - `index.html`: Visual HTML report
 - `reg.json`: JSON statistics (total, passed, changed, new, deleted)
 - Updates `project.json` with comparison metadata
+
+### Self-Contained Reports (`--aggregate-screenshots`)
+
+By default, the comparison report references screenshot images via relative paths (`../sets/baseline`, `../sets/current`) that point outside the comparison directory. This works when browsing locally but breaks when you upload just the comparison directory to a static host like Netlify, GitHub Pages, or S3.
+
+Use `--aggregate-screenshots` to make the comparison directory fully self-contained:
+
+- Copies both screenshot sets into `<comparison-dir>/sets/baseline/` and `<comparison-dir>/sets/current/`
+- Rewrites image paths in both `reg.json` and `index.html` to `./sets/<name>`
+- The entire comparison directory can then be uploaded as-is and will work correctly
+
+```bash
+# Generate a self-contained report
+vr-drupal compare my-site \
+  --source baseline \
+  --target current \
+  --aggregate-screenshots \
+  --no-interactive
+
+# Upload the comparison directory to Netlify, S3, etc.
+netlify deploy --dir .visual-regression/my-site/screenshot-sets/comparisons/baseline--current/
+```
 
 ### Statistics Output
 
@@ -518,10 +548,11 @@ vr-drupal take \
   --id pr-$CI_MERGE_REQUEST_IID \
   --no-interactive
 
-# Compare and get JSON result
+# Compare and get JSON result (--aggregate-screenshots for uploadable report)
 RESULT=$(vr-drupal compare \
   --source baseline-$CI_COMMIT_SHA \
   --target pr-$CI_MERGE_REQUEST_IID \
+  --aggregate-screenshots \
   --output-format json \
   --no-interactive)
 
