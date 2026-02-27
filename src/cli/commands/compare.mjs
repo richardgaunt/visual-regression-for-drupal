@@ -11,6 +11,7 @@ import { exec } from 'child_process';
 import { platform } from 'os';
 import { compareScreenshots } from '../../lib/visual-regression/comparison.mjs';
 import { ensureDirectory } from '../../lib/visual-regression/screenshot-set-manager.mjs';
+import { getAllSnapshots } from '../../lib/visual-regression/snapshot-manager.mjs';
 import {
   getAllProjects,
   loadProjectFromDirectory,
@@ -102,8 +103,8 @@ export const compareCommand = new Command('compare')
       process.exit(3);
     }
 
-    // Get snapshots
-    const snapshots = projectConfig.snapshots || {};
+    // Get snapshots from set.json files
+    const snapshots = getAllSnapshots(projectDir);
     const snapshotIds = Object.keys(snapshots);
 
     if (snapshotIds.length < 2) {

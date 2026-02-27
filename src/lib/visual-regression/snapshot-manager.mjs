@@ -8,6 +8,74 @@ import { ensureDirectory } from './screenshot-set-manager.mjs';
 import { projectsDir } from '../../utils/project-manager.mjs';
 
 /**
+ * Write set.json metadata into a snapshot directory
+ *
+ * @param {string} projectPath - Absolute path to the project directory
+ * @param {string} snapshotId - Snapshot identifier
+ * @param {Object} metadata - Metadata to write (date, count)
+ */
+export function writeSetMetadata(projectPath, snapshotId, metadata) {
+  const setJsonPath = path.join(projectPath, 'screenshot-sets', 'sets', snapshotId, 'set.json');
+  const setData = {
+    id: snapshotId,
+    directory: `screenshot-sets/sets/${snapshotId}`,
+    date: metadata.date,
+    count: metadata.count
+  };
+  fs.writeFileSync(setJsonPath, JSON.stringify(setData, null, 2), 'utf8');
+}
+
+/**
+ * Read set.json metadata from a specific snapshot directory
+ *
+ * @param {string} projectPath - Absolute path to the project directory
+ * @param {string} snapshotId - Snapshot identifier
+ * @returns {Object|null} - Set metadata or null if not found
+ */
+export function readSetMetadata(projectPath, snapshotId) {
+  const setJsonPath = path.join(projectPath, 'screenshot-sets', 'sets', snapshotId, 'set.json');
+  if (!fs.existsSync(setJsonPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(setJsonPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Scan all snapshot directories and read their set.json files
+ *
+ * @param {string} projectPath - Absolute path to the project directory
+ * @returns {Object} - Map of snapshot ID to metadata
+ */
+export function getAllSnapshots(projectPath) {
+  const setsDir = path.join(projectPath, 'screenshot-sets', 'sets');
+  if (!fs.existsSync(setsDir)) return {};
+
+  const snapshots = {};
+  let dirs;
+  try {
+    dirs = fs.readdirSync(setsDir, { withFileTypes: true });
+  } catch {
+    return {};
+  }
+
+  for (const dir of dirs) {
+    if (!dir.isDirectory()) continue;
+    const setJsonPath = path.join(setsDir, dir.name, 'set.json');
+    if (fs.existsSync(setJsonPath)) {
+      try {
+        snapshots[dir.name] = JSON.parse(fs.readFileSync(setJsonPath, 'utf8'));
+      } catch {
+        // skip invalid set.json files
+      }
+    }
+  }
+
+  return snapshots;
+}
+
+/**
  * Create a new snapshot for a project
  *
  * @param {string} projectDir - Project directory name
@@ -68,31 +136,20 @@ export async function createSnapshot(projectDir, snapshotId, config, overwrite =
 }
 
 /**
- * Update project configuration with snapshot information
+ * Update project with snapshot information by writing set.json
  *
  * @param {string} projectDir - Project directory name
  * @param {Object} snapshotInfo - Snapshot information
- * @returns {Promise<boolean>} - Success status
+ * @returns {boolean} - Success status
  */
-export async function updateProjectWithSnapshot(projectDir, snapshotInfo) {
+export function updateProjectWithSnapshot(projectDir, snapshotInfo) {
   const projectPath = path.join(projectsDir, projectDir);
-  const configPath = path.join(projectPath, 'project.json');
 
   try {
-    const configData = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(configData);
-
-    if (!config.snapshots) {
-      config.snapshots = {};
-    }
-
-    config.snapshots[snapshotInfo.id] = {
-      directory: snapshotInfo.directory,
+    writeSetMetadata(projectPath, snapshotInfo.id, {
       date: snapshotInfo.date,
       count: snapshotInfo.count
-    };
-
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+    });
     return true;
   } catch (error) {
     console.error(`Error updating project with snapshot: ${error.message}`);
@@ -108,17 +165,7 @@ export async function updateProjectWithSnapshot(projectDir, snapshotInfo) {
  */
 export function getProjectSnapshots(projectDir) {
   const projectPath = path.join(projectsDir, projectDir);
-  const configPath = path.join(projectPath, 'project.json');
-
-  try {
-    const configData = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(configData);
-
-    return config.snapshots || {};
-  } catch (error) {
-    console.error(`Error getting project snapshots: ${error.message}`);
-    return {};
-  }
+  return getAllSnapshots(projectPath);
 }
 
 /**
@@ -129,8 +176,8 @@ export function getProjectSnapshots(projectDir) {
  * @returns {Object|null} - Snapshot information
  */
 export function getSnapshotById(projectDir, snapshotId) {
-  const snapshots = getProjectSnapshots(projectDir);
-  return snapshots[snapshotId] || null;
+  const projectPath = path.join(projectsDir, projectDir);
+  return readSetMetadata(projectPath, snapshotId);
 }
 
 /**
@@ -142,10 +189,9 @@ export function getSnapshotById(projectDir, snapshotId) {
  */
 export function deleteSnapshot(projectDir, snapshotId) {
   const projectPath = path.join(projectsDir, projectDir);
-  const configPath = path.join(projectPath, 'project.json');
 
   try {
-    const snapshot = getSnapshotById(projectDir, snapshotId);
+    const snapshot = readSetMetadata(projectPath, snapshotId);
     if (!snapshot) {
       return false;
     }
@@ -153,14 +199,6 @@ export function deleteSnapshot(projectDir, snapshotId) {
     const snapshotDir = path.join(projectPath, snapshot.directory);
     if (fs.existsSync(snapshotDir)) {
       fs.rmSync(snapshotDir, { recursive: true, force: true });
-    }
-
-    const configData = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(configData);
-
-    if (config.snapshots && config.snapshots[snapshotId]) {
-      delete config.snapshots[snapshotId];
-      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
     }
 
     return true;

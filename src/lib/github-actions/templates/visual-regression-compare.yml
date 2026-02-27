@@ -60,7 +60,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Register baseline in project.json
+      - name: Register baseline set metadata
         if: steps.download-baseline.outputs.has_baseline == 'true'
         run: |
           cd {{PROJECT_DIR}}
@@ -68,13 +68,15 @@ jobs:
           # Count screenshots in baseline
           SCREENSHOT_COUNT=$(find screenshot-sets/sets/baseline -name "*.png" | wc -l)
 
-          # Add baseline snapshot entry to project.json
-          jq --arg count "$SCREENSHOT_COUNT" \
-            '.snapshots.baseline = {
-              "directory": "screenshot-sets/sets/baseline",
-              "date": (now | todate),
-              "count": ($count | tonumber)
-            }' project.json > project.json.tmp && mv project.json.tmp project.json
+          # Write set.json metadata alongside the screenshots
+          cat > screenshot-sets/sets/baseline/set.json << EOF
+          {
+            "id": "baseline",
+            "directory": "screenshot-sets/sets/baseline",
+            "date": "$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")",
+            "count": ${SCREENSHOT_COUNT}
+          }
+          EOF
 
       - name: Take current screenshots
         if: steps.download-baseline.outputs.has_baseline == 'true'

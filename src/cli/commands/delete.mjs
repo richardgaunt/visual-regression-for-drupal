@@ -7,6 +7,7 @@ import chalk from 'chalk';
 import { existsSync, rmSync } from 'fs';
 import { join, resolve } from 'path';
 import { select, confirm } from '@inquirer/prompts';
+import { getAllSnapshots } from '../../lib/visual-regression/snapshot-manager.mjs';
 import {
   getAllProjects,
   loadProjectFromDirectory,
@@ -69,7 +70,7 @@ export const deleteCommand = new Command('delete')
     // Delete specific snapshot
     if (options.snapshot) {
       const snapshotId = options.snapshot;
-      const snapshots = projectConfig.snapshots || {};
+      const snapshots = getAllSnapshots(projectDir);
 
       if (!snapshots[snapshotId]) {
         console.error(chalk.red(`Error: Snapshot "${snapshotId}" not found`));
@@ -87,15 +88,11 @@ export const deleteCommand = new Command('delete')
         }
       }
 
-      // Delete snapshot directory
+      // Delete snapshot directory (includes set.json)
       const snapshotDir = join(projectDir, snapshots[snapshotId].directory);
       if (existsSync(snapshotDir)) {
         rmSync(snapshotDir, { recursive: true, force: true });
       }
-
-      // Update config
-      delete projectConfig.snapshots[snapshotId];
-      saveProjectToDirectory(projectDir, projectConfig);
 
       console.log(chalk.green(`Snapshot "${snapshotId}" deleted.`));
       return;
@@ -139,7 +136,7 @@ export const deleteCommand = new Command('delete')
     // Delete entire project
     if (!options.force) {
       if (isInteractive) {
-        const snapshotCount = Object.keys(projectConfig.snapshots || {}).length;
+        const snapshotCount = Object.keys(getAllSnapshots(projectDir)).length;
         const comparisonCount = Object.keys(projectConfig.comparisons || {}).length;
 
         console.log(chalk.yellow(`This will delete project "${projectConfig.name}" including:`));

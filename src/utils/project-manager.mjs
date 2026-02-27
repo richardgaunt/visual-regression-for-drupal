@@ -78,7 +78,6 @@ export function saveProjectConfiguration(config) {
  */
 export function loadProjectConfiguration(directoryName) {
   const configPath = join(projectsDir, directoryName, 'project.json');
-  const projectDir = join(projectsDir, directoryName);
 
   try {
     const content = readFileSync(configPath, 'utf8');
@@ -90,9 +89,6 @@ export function loadProjectConfiguration(directoryName) {
       console.error(formatValidationErrors(validation.errors));
       return null;
     }
-
-    // Clean up missing snapshots
-    cleanupMissingSnapshots(projectDir, config);
 
     return config;
   } catch (error) { // eslint-disable-line no-unused-vars
@@ -128,42 +124,6 @@ export function getAllProjects() {
 }
 
 /**
- * Clean up missing snapshots from project configuration
- * Removes snapshot entries where the directory no longer exists
- * @param {string} projectDir - The project directory path
- * @param {Object} config - The project configuration
- * @returns {Object} - The cleaned configuration (mutated)
- */
-export function cleanupMissingSnapshots(projectDir, config) {
-  if (!config.snapshots) {
-    return config;
-  }
-
-  let hasChanges = false;
-  const snapshotIds = Object.keys(config.snapshots);
-
-  for (const snapshotId of snapshotIds) {
-    const snapshot = config.snapshots[snapshotId];
-    const snapshotDir = join(projectDir, snapshot.directory);
-
-    if (!existsSync(snapshotDir)) {
-      console.log(`Could not find the "${snapshotId}" set. Cleaning up project file.`);
-      delete config.snapshots[snapshotId];
-      hasChanges = true;
-    }
-  }
-
-  // Save updated config if changes were made
-  if (hasChanges) {
-    config.updatedAt = new Date().toISOString();
-    const configPath = join(projectDir, 'project.json');
-    writeFileSync(configPath, JSON.stringify(config, null, 2));
-  }
-
-  return config;
-}
-
-/**
  * Load project configuration from a specific directory path
  * @param {string} projectDir - The absolute or relative path to the project directory
  * @returns {Object|null} - The project configuration or null if not found or invalid
@@ -185,9 +145,6 @@ export function loadProjectFromDirectory(projectDir) {
       console.error(formatValidationErrors(validation.errors));
       return null;
     }
-
-    // Clean up missing snapshots
-    cleanupMissingSnapshots(projectDir, config);
 
     return config;
   } catch (error) { // eslint-disable-line no-unused-vars

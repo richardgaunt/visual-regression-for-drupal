@@ -85,6 +85,7 @@ async function showExternalProjectMenu(projectDir) {
   const { compareScreenshots } = await import('./src/lib/visual-regression/comparison.mjs');
   const { captureUrlScreenshots, determineOptimalConcurrency } = await import('./src/lib/visual-regression/screenshot.mjs');
   const { ensureDirectory } = await import('./src/lib/visual-regression/screenshot-set-manager.mjs');
+  const { getAllSnapshots, writeSetMetadata } = await import('./src/lib/visual-regression/snapshot-manager.mjs');
 
   const absoluteProjectDir = resolve(projectDir);
   const projectConfig = loadProjectFromDirectory(absoluteProjectDir);
@@ -116,7 +117,7 @@ async function showExternalProjectMenu(projectDir) {
   switch (action) {
     case 'snapshot': {
       // Show existing snapshots
-      const existingSnapshots = projectConfig.snapshots || {};
+      const existingSnapshots = getAllSnapshots(absoluteProjectDir);
       const snapshotCount = Object.keys(existingSnapshots).length;
 
       if (snapshotCount > 0) {
@@ -162,15 +163,11 @@ async function showExternalProjectMenu(projectDir) {
         advancedOptions: projectConfig['visual-diff'].advanced
       });
 
-      if (!projectConfig.snapshots) {
-        projectConfig.snapshots = {};
-      }
-      projectConfig.snapshots[snapshotId] = {
-        directory: `screenshot-sets/sets/${snapshotId}`,
+      // Write set.json metadata alongside the screenshots
+      writeSetMetadata(absoluteProjectDir, snapshotId, {
         date: new Date().toISOString(),
         count: result.count
-      };
-      saveProjectToDirectory(absoluteProjectDir, projectConfig);
+      });
 
       console.log(chalk.green(`Snapshot "${snapshotId}" created with ${result.count} screenshots.`));
       await input({ message: 'Press Enter to continue...', default: '' });
@@ -179,7 +176,7 @@ async function showExternalProjectMenu(projectDir) {
     }
 
     case 'compare': {
-      const snapshots = projectConfig.snapshots || {};
+      const snapshots = getAllSnapshots(absoluteProjectDir);
       const snapshotIds = Object.keys(snapshots);
 
       if (snapshotIds.length < 2) {
@@ -257,7 +254,7 @@ async function showExternalProjectMenu(projectDir) {
       console.log(chalk.cyan(`  Viewports: ${projectConfig['visual-diff'].viewports.map(v => v.name).join(', ')}`));
       console.log();
 
-      const snapshots = projectConfig.snapshots || {};
+      const snapshots = getAllSnapshots(absoluteProjectDir);
       console.log(chalk.white.bold(`Snapshots (${Object.keys(snapshots).length}):`));
       for (const [id, snapshot] of Object.entries(snapshots)) {
         console.log(chalk.cyan(`  ${id}: ${snapshot.count} screenshots (${new Date(snapshot.date).toLocaleDateString()})`));

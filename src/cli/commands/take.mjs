@@ -9,10 +9,10 @@ import { join, resolve } from 'path';
 import { input, confirm, select } from '@inquirer/prompts';
 import { captureUrlScreenshots, determineOptimalConcurrency } from '../../lib/visual-regression/screenshot.mjs';
 import { ensureDirectory } from '../../lib/visual-regression/screenshot-set-manager.mjs';
+import { getAllSnapshots, writeSetMetadata } from '../../lib/visual-regression/snapshot-manager.mjs';
 import {
   getAllProjects,
   loadProjectFromDirectory,
-  saveProjectToDirectory,
   resolveProjectDir,
   projectsDir
 } from '../../utils/project-manager.mjs';
@@ -80,8 +80,8 @@ export const takeCommand = new Command('take')
     projectIdentifier = projectDir;
 
     // Show existing snapshots
-    if (isInteractive && projectConfig.snapshots) {
-      const snapshots = projectConfig.snapshots;
+    if (isInteractive) {
+      const snapshots = getAllSnapshots(projectDir);
       const snapshotCount = Object.keys(snapshots).length;
 
       if (snapshotCount > 0) {
@@ -206,17 +206,11 @@ export const takeCommand = new Command('take')
         basicAuth
       });
 
-      // Update project configuration with snapshot info
-      if (!projectConfig.snapshots) {
-        projectConfig.snapshots = {};
-      }
-      projectConfig.snapshots[snapshotId] = {
-        directory: `screenshot-sets/sets/${snapshotId}`,
+      // Write set.json metadata alongside the screenshots
+      writeSetMetadata(projectDir, snapshotId, {
         date: new Date().toISOString(),
         count: result.count
-      };
-
-      saveProjectToDirectory(projectDir, projectConfig);
+      });
 
       console.log();
       console.log(chalk.green(`Snapshot "${snapshotId}" created successfully!`));

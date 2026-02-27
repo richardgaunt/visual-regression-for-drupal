@@ -71,24 +71,36 @@ export function getComparisonPath(projectDir, sourceId, targetId) {
 }
 
 /**
- * Get all screenshot sets for a project
+ * Get all screenshot sets for a project by scanning set.json files
  *
  * @param {string} projectDir - Project directory name
- * @returns {Object} - Set information from project.json
+ * @returns {Object} - Set information from set.json files
  */
 export function getScreenshotSets(projectDir) {
   const projectPath = path.join(projectsDir, projectDir);
-  const configPath = path.join(projectPath, 'project.json');
+  const setsDir = path.join(projectPath, 'screenshot-sets', 'sets');
+  if (!fs.existsSync(setsDir)) return {};
 
+  const snapshots = {};
   try {
-    const configData = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(configData);
-
-    return config.snapshots || {};
+    const dirs = fs.readdirSync(setsDir, { withFileTypes: true });
+    for (const dir of dirs) {
+      if (!dir.isDirectory()) continue;
+      const setJsonPath = path.join(setsDir, dir.name, 'set.json');
+      if (fs.existsSync(setJsonPath)) {
+        try {
+          snapshots[dir.name] = JSON.parse(fs.readFileSync(setJsonPath, 'utf8'));
+        } catch {
+          // skip invalid set.json files
+        }
+      }
+    }
   } catch (error) {
     console.error(`Error getting screenshot sets: ${error.message}`);
     return {};
   }
+
+  return snapshots;
 }
 
 /**

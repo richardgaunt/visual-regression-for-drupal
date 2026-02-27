@@ -98,30 +98,6 @@
       "type": "string",
       "format": "date-time",
       "description": "ISO 8601 timestamp when the project was last updated"
-    },
-    "snapshots": {
-      "type": "object",
-      "description": "Collection of saved snapshot sets",
-      "additionalProperties": {
-        "type": "object",
-        "required": ["directory", "date", "count"],
-        "properties": {
-          "directory": {
-            "type": "string",
-            "description": "Directory path where snapshot images are stored"
-          },
-          "date": {
-            "type": "string",
-            "format": "date-time",
-            "description": "ISO 8601 timestamp when snapshot was taken"
-          },
-          "count": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "Number of screenshots in this snapshot set"
-          }
-        }
-      }
     }
   }
 }

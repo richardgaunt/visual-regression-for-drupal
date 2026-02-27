@@ -39,14 +39,7 @@ describe('Project Configuration Validation', () => {
           }
         },
         createdAt: '2025-01-01T00:00:00.000Z',
-        updatedAt: '2025-01-02T00:00:00.000Z',
-        snapshots: {
-          'snapshot-20250101': {
-            directory: 'screenshots/snapshot-20250101',
-            date: '2025-01-01T12:00:00.000Z',
-            count: 5
-          }
-        }
+        updatedAt: '2025-01-02T00:00:00.000Z'
       };
 
       const result = validateProjectConfiguration(config);
@@ -122,46 +115,6 @@ describe('Project Configuration Validation', () => {
       const result = validateProjectConfiguration(config);
       expect(result.valid).toBe(false);
       expect(result.errors[0].path).toContain('createdAt');
-    });
-
-    it('should validate snapshots with any key name', () => {
-      const config = {
-        name: 'Test',
-        directoryName: 'test',
-        snapshots: {
-          'snapshot-20250101': {
-            directory: 'dir',
-            date: '2025-01-01T00:00:00.000Z',
-            count: 1
-          },
-          'custom-snapshot': {
-            directory: 'dir2',
-            date: '2025-01-02T00:00:00.000Z',
-            count: 2
-          }
-        }
-      };
-
-      const result = validateProjectConfiguration(config);
-      expect(result.valid).toBe(true);
-      expect(result.errors).toEqual([]);
-    });
-
-    it('should reject snapshots missing required fields', () => {
-      const config = {
-        name: 'Test',
-        directoryName: 'test',
-        snapshots: {
-          'snapshot-001': {
-            directory: 'dir'
-            // Missing date and count
-          }
-        }
-      };
-
-      const result = validateProjectConfiguration(config);
-      expect(result.valid).toBe(false);
-      expect(result.errors[0].message).toContain('must have required property');
     });
   });
 

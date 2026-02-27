@@ -4,7 +4,9 @@
  */
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { getAllProjects } from '../../utils/project-manager.mjs';
+import { join } from 'path';
+import { getAllSnapshots } from '../../lib/visual-regression/snapshot-manager.mjs';
+import { getAllProjects, projectsDir } from '../../utils/project-manager.mjs';
 
 export const listCommand = new Command('list')
   .description('List all visual regression projects')
@@ -29,7 +31,8 @@ export const listCommand = new Command('list')
     console.log();
 
     for (const project of projects) {
-      const snapshotCount = project.snapshots ? Object.keys(project.snapshots).length : 0;
+      const projectPath = join(projectsDir, project.directoryName);
+      const snapshotCount = Object.keys(getAllSnapshots(projectPath)).length;
       const comparisonCount = project.comparisons ? Object.keys(project.comparisons).length : 0;
 
       console.log(chalk.white.bold(project.name));

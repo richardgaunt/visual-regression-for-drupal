@@ -6,6 +6,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { join, resolve } from 'path';
 import { select } from '@inquirer/prompts';
+import { getAllSnapshots } from '../../lib/visual-regression/snapshot-manager.mjs';
 import {
   getAllProjects,
   loadProjectFromDirectory,
@@ -66,7 +67,7 @@ export const showCommand = new Command('show')
       let output = projectConfig;
 
       if (options.snapshots) {
-        output = projectConfig.snapshots || {};
+        output = getAllSnapshots(projectDir);
       } else if (options.comparisons) {
         output = projectConfig.comparisons || {};
       } else if (options.config) {
@@ -119,7 +120,7 @@ export const showCommand = new Command('show')
 
     // Show snapshots
     if (options.snapshots || (!options.config && !options.comparisons)) {
-      const snapshots = projectConfig.snapshots || {};
+      const snapshots = getAllSnapshots(projectDir);
       const snapshotIds = Object.keys(snapshots);
 
       console.log(chalk.white.bold(`Snapshots (${snapshotIds.length}):`));
