@@ -1,10 +1,15 @@
 /**
- * Test suite for aggregateScreenshots
+ * Test suite for aggregateScreenshots and comparison metadata
  */
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { aggregateScreenshots } from '../src/lib/visual-regression/comparison.mjs';
+import {
+  writeComparisonMetadata,
+  readComparisonMetadata,
+  getAllComparisons
+} from '../src/lib/visual-regression/snapshot-manager.mjs';
 
 function createTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'vr-test-'));
@@ -82,5 +87,107 @@ describe('aggregateScreenshots', () => {
     expect(html).toContain('"./sets/current"');
     expect(html).not.toContain('"../sets/baseline"');
     expect(html).not.toContain('"../sets/current"');
+  });
+});
+
+describe('comparison metadata', () => {
+  let projectPath;
+
+  beforeEach(() => {
+    projectPath = fs.mkdtempSync(path.join(os.tmpdir(), 'vr-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  describe('writeComparisonMetadata', () => {
+    it('should create a valid comparison.json', () => {
+      const comparisonId = 'baseline--current';
+      const comparisonDir = path.join(projectPath, 'screenshot-sets', 'comparisons', comparisonId);
+      fs.mkdirSync(comparisonDir, { recursive: true });
+
+      const metadata = {
+        source: 'baseline',
+        target: 'current',
+        date: '2026-01-15T10:00:00.000Z',
+        statistics: { total: 10, passed: 8, changed: 1, new: 1, deleted: 0 }
+      };
+
+      writeComparisonMetadata(projectPath, comparisonId, metadata);
+
+      const jsonPath = path.join(comparisonDir, 'comparison.json');
+      expect(fs.existsSync(jsonPath)).toBe(true);
+
+      const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      expect(data.id).toBe(comparisonId);
+      expect(data.source).toBe('baseline');
+      expect(data.target).toBe('current');
+      expect(data.directory).toBe('screenshot-sets/comparisons/baseline--current');
+      expect(data.date).toBe('2026-01-15T10:00:00.000Z');
+      expect(data.statistics.total).toBe(10);
+    });
+  });
+
+  describe('readComparisonMetadata', () => {
+    it('should read comparison.json back', () => {
+      const comparisonId = 'before--after';
+      const comparisonDir = path.join(projectPath, 'screenshot-sets', 'comparisons', comparisonId);
+      fs.mkdirSync(comparisonDir, { recursive: true });
+
+      const metadata = {
+        source: 'before',
+        target: 'after',
+        date: '2026-02-01T12:00:00.000Z',
+        statistics: { total: 5, passed: 5, changed: 0, new: 0, deleted: 0 }
+      };
+      writeComparisonMetadata(projectPath, comparisonId, metadata);
+
+      const result = readComparisonMetadata(projectPath, comparisonId);
+      expect(result).not.toBeNull();
+      expect(result.id).toBe(comparisonId);
+      expect(result.source).toBe('before');
+      expect(result.target).toBe('after');
+    });
+
+    it('should return null for missing comparison', () => {
+      const result = readComparisonMetadata(projectPath, 'nonexistent--id');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('getAllComparisons', () => {
+    it('should discover multiple comparison directories', () => {
+      const ids = ['a--b', 'c--d', 'e--f'];
+      for (const id of ids) {
+        const dir = path.join(projectPath, 'screenshot-sets', 'comparisons', id);
+        fs.mkdirSync(dir, { recursive: true });
+        writeComparisonMetadata(projectPath, id, {
+          source: id.split('--')[0],
+          target: id.split('--')[1],
+          date: new Date().toISOString(),
+          statistics: { total: 1, passed: 1, changed: 0, new: 0, deleted: 0 }
+        });
+      }
+
+      const comparisons = getAllComparisons(projectPath);
+      expect(Object.keys(comparisons)).toHaveLength(3);
+      expect(comparisons['a--b']).toBeDefined();
+      expect(comparisons['c--d']).toBeDefined();
+      expect(comparisons['e--f']).toBeDefined();
+    });
+
+    it('should return empty object when no comparisons exist', () => {
+      const comparisons = getAllComparisons(projectPath);
+      expect(comparisons).toEqual({});
+    });
+
+    it('should skip directories without comparison.json', () => {
+      const dir = path.join(projectPath, 'screenshot-sets', 'comparisons', 'orphan--dir');
+      fs.mkdirSync(dir, { recursive: true });
+
+      const comparisons = getAllComparisons(projectPath);
+      expect(Object.keys(comparisons)).toHaveLength(0);
+    });
   });
 });

@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { join, resolve } from 'path';
 import { select } from '@inquirer/prompts';
-import { getAllSnapshots } from '../../lib/visual-regression/snapshot-manager.mjs';
+import { getAllSnapshots, getAllComparisons } from '../../lib/visual-regression/snapshot-manager.mjs';
 import {
   getAllProjects,
   loadProjectFromDirectory,
@@ -69,7 +69,7 @@ export const showCommand = new Command('show')
       if (options.snapshots) {
         output = getAllSnapshots(projectDir);
       } else if (options.comparisons) {
-        output = projectConfig.comparisons || {};
+        output = getAllComparisons(projectDir);
       } else if (options.config) {
         output = projectConfig['visual-diff'] || {};
       }
@@ -141,7 +141,7 @@ export const showCommand = new Command('show')
 
     // Show comparisons
     if (options.comparisons || (!options.config && !options.snapshots)) {
-      const comparisons = projectConfig.comparisons || {};
+      const comparisons = getAllComparisons(projectDir);
       const comparisonIds = Object.keys(comparisons);
 
       console.log(chalk.white.bold(`Comparisons (${comparisonIds.length}):`));

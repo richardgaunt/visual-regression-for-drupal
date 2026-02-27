@@ -76,6 +76,76 @@ export function getAllSnapshots(projectPath) {
 }
 
 /**
+ * Write comparison.json metadata into a comparison directory
+ *
+ * @param {string} projectPath - Absolute path to the project directory
+ * @param {string} comparisonId - Comparison identifier (format: source--target)
+ * @param {Object} metadata - Metadata to write (source, target, directory, date, statistics)
+ */
+export function writeComparisonMetadata(projectPath, comparisonId, metadata) {
+  const comparisonJsonPath = path.join(projectPath, 'screenshot-sets', 'comparisons', comparisonId, 'comparison.json');
+  const comparisonData = {
+    id: comparisonId,
+    source: metadata.source,
+    target: metadata.target,
+    directory: `screenshot-sets/comparisons/${comparisonId}`,
+    date: metadata.date,
+    statistics: metadata.statistics
+  };
+  fs.writeFileSync(comparisonJsonPath, JSON.stringify(comparisonData, null, 2), 'utf8');
+}
+
+/**
+ * Read comparison.json metadata from a specific comparison directory
+ *
+ * @param {string} projectPath - Absolute path to the project directory
+ * @param {string} comparisonId - Comparison identifier
+ * @returns {Object|null} - Comparison metadata or null if not found
+ */
+export function readComparisonMetadata(projectPath, comparisonId) {
+  const comparisonJsonPath = path.join(projectPath, 'screenshot-sets', 'comparisons', comparisonId, 'comparison.json');
+  if (!fs.existsSync(comparisonJsonPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(comparisonJsonPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Scan all comparison directories and read their comparison.json files
+ *
+ * @param {string} projectPath - Absolute path to the project directory
+ * @returns {Object} - Map of comparison ID to metadata
+ */
+export function getAllComparisons(projectPath) {
+  const comparisonsDir = path.join(projectPath, 'screenshot-sets', 'comparisons');
+  if (!fs.existsSync(comparisonsDir)) return {};
+
+  const comparisons = {};
+  let dirs;
+  try {
+    dirs = fs.readdirSync(comparisonsDir, { withFileTypes: true });
+  } catch {
+    return {};
+  }
+
+  for (const dir of dirs) {
+    if (!dir.isDirectory()) continue;
+    const comparisonJsonPath = path.join(comparisonsDir, dir.name, 'comparison.json');
+    if (fs.existsSync(comparisonJsonPath)) {
+      try {
+        comparisons[dir.name] = JSON.parse(fs.readFileSync(comparisonJsonPath, 'utf8'));
+      } catch {
+        // skip invalid comparison.json files
+      }
+    }
+  }
+
+  return comparisons;
+}
+
+/**
  * Create a new snapshot for a project
  *
  * @param {string} projectDir - Project directory name

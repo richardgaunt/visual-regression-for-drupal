@@ -1,20 +1,21 @@
 /**
  * Compare screenshots command for visual regression testing
  */
+import path from 'path';
 import chalk from 'chalk';
 import { input, select, confirm } from '@inquirer/prompts';
 import { exec } from 'child_process';
 import { platform } from 'os';
 import {
   loadProjectConfiguration,
-  convertProjectNameToDirectory
+  convertProjectNameToDirectory,
+  projectsDir
 } from '../utils/project-manager.mjs';
 import { selectProject } from './take-snapshot.mjs';
-import { getProjectSnapshots } from '../lib/visual-regression/snapshot-manager.mjs';
+import { getProjectSnapshots, writeComparisonMetadata } from '../lib/visual-regression/snapshot-manager.mjs';
 import {
   getScreenshotSetPath,
   getComparisonPath,
-  updateProjectWithComparison
 } from '../lib/visual-regression/screenshot-set-manager.mjs';
 import { compareScreenshots } from '../lib/visual-regression/comparison.mjs';
 
@@ -191,7 +192,13 @@ export async function compareScreenshotSets(projectName, returnToMainMenu = true
 
     const comparisonResult = await compareScreenshots(sourceDir, targetDir, outputDir);
 
-    await updateProjectWithComparison(projectDir, sourceId, targetId, comparisonResult);
+    const projectPath = path.join(projectsDir, projectDir);
+    writeComparisonMetadata(projectPath, comparisonId, {
+      source: sourceId,
+      target: targetId,
+      date: comparisonResult.date || new Date().toISOString(),
+      statistics: comparisonResult.statistics
+    });
 
     console.log();
     console.log(chalk.green(`✅ Comparison completed successfully!`));

@@ -116,93 +116,21 @@ export function getScreenshotSetById(projectDir, setId) {
 }
 
 /**
- * Update project configuration with comparison information
- *
- * @param {string} projectDir - Project directory name
- * @param {string} sourceId - Source set identifier
- * @param {string} targetId - Target set identifier
- * @param {Object} comparisonInfo - Comparison information
- * @returns {boolean} - Success status
- */
-export function updateProjectWithComparison(projectDir, sourceId, targetId, comparisonInfo) {
-  const projectPath = path.join(projectsDir, projectDir);
-  const configPath = path.join(projectPath, 'project.json');
-
-  try {
-    const configData = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(configData);
-
-    if (!config.comparisons) {
-      config.comparisons = {};
-    }
-
-    const comparisonId = `${sourceId}--${targetId}`;
-
-    config.comparisons[comparisonId] = {
-      source: sourceId,
-      target: targetId,
-      directory: comparisonInfo.directory,
-      date: comparisonInfo.date,
-      statistics: comparisonInfo.statistics
-    };
-
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
-    return true;
-  } catch (error) {
-    console.error(`Error updating project with comparison: ${error.message}`);
-    return false;
-  }
-}
-
-/**
- * Get all comparisons for a project
- *
- * @param {string} projectDir - Project directory name
- * @returns {Object} - Comparison information
- */
-export function getProjectComparisons(projectDir) {
-  const projectPath = path.join(projectsDir, projectDir);
-  const configPath = path.join(projectPath, 'project.json');
-
-  try {
-    const configData = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(configData);
-
-    return config.comparisons || {};
-  } catch (error) {
-    console.error(`Error getting project comparisons: ${error.message}`);
-    return {};
-  }
-}
-
-/**
- * Delete a comparison
+ * Delete a comparison directory
  *
  * @param {string} projectDir - Project directory name
  * @param {string} comparisonId - Comparison identifier (format: source--target)
  * @returns {boolean} - Success status
  */
 export function deleteComparison(projectDir, comparisonId) {
-  const projectPath = path.join(projectsDir, projectDir);
-  const configPath = path.join(projectPath, 'project.json');
+  const comparisonDir = path.join(getComparisonsDirectory(projectDir), comparisonId);
 
   try {
-    const configData = fs.readFileSync(configPath, 'utf8');
-    const config = JSON.parse(configData);
-
-    if (!config.comparisons || !config.comparisons[comparisonId]) {
+    if (!fs.existsSync(comparisonDir)) {
       return false;
     }
 
-    const comparison = config.comparisons[comparisonId];
-
-    const comparisonDir = path.join(projectPath, comparison.directory);
-    if (fs.existsSync(comparisonDir)) {
-      fs.rmSync(comparisonDir, { recursive: true, force: true });
-    }
-
-    delete config.comparisons[comparisonId];
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+    fs.rmSync(comparisonDir, { recursive: true, force: true });
     return true;
   } catch (error) {
     console.error(`Error deleting comparison: ${error.message}`);

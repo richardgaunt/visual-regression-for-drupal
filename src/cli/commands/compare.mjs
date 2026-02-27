@@ -11,11 +11,10 @@ import { exec } from 'child_process';
 import { platform } from 'os';
 import { compareScreenshots, aggregateScreenshots } from '../../lib/visual-regression/comparison.mjs';
 import { ensureDirectory } from '../../lib/visual-regression/screenshot-set-manager.mjs';
-import { getAllSnapshots } from '../../lib/visual-regression/snapshot-manager.mjs';
+import { getAllSnapshots, writeComparisonMetadata } from '../../lib/visual-regression/snapshot-manager.mjs';
 import {
   getAllProjects,
   loadProjectFromDirectory,
-  saveProjectToDirectory,
   resolveProjectDir,
   projectsDir
 } from '../../utils/project-manager.mjs';
@@ -196,20 +195,13 @@ export const compareCommand = new Command('compare')
         aggregateScreenshots(sourceDir, targetDir, outputDir);
       }
 
-      // Update project with comparison info
-      if (!projectConfig.comparisons) {
-        projectConfig.comparisons = {};
-      }
-
-      projectConfig.comparisons[comparisonId] = {
+      // Write comparison metadata
+      writeComparisonMetadata(projectDir, comparisonId, {
         source: sourceId,
         target: targetId,
-        directory: `screenshot-sets/comparisons/${comparisonId}`,
         date: new Date().toISOString(),
         statistics: result.statistics
-      };
-
-      saveProjectToDirectory(projectDir, projectConfig);
+      });
 
       console.log();
       console.log(chalk.green('Comparison completed!'));

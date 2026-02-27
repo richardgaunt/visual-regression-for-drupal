@@ -7,11 +7,10 @@ import chalk from 'chalk';
 import { existsSync, rmSync } from 'fs';
 import { join, resolve } from 'path';
 import { select, confirm } from '@inquirer/prompts';
-import { getAllSnapshots } from '../../lib/visual-regression/snapshot-manager.mjs';
+import { getAllSnapshots, getAllComparisons } from '../../lib/visual-regression/snapshot-manager.mjs';
 import {
   getAllProjects,
   loadProjectFromDirectory,
-  saveProjectToDirectory,
   resolveProjectDir,
   projectsDir
 } from '../../utils/project-manager.mjs';
@@ -101,7 +100,7 @@ export const deleteCommand = new Command('delete')
     // Delete specific comparison
     if (options.comparison) {
       const comparisonId = options.comparison;
-      const comparisons = projectConfig.comparisons || {};
+      const comparisons = getAllComparisons(projectDir);
 
       if (!comparisons[comparisonId]) {
         console.error(chalk.red(`Error: Comparison "${comparisonId}" not found`));
@@ -119,15 +118,11 @@ export const deleteCommand = new Command('delete')
         }
       }
 
-      // Delete comparison directory
+      // Delete comparison directory (includes comparison.json)
       const comparisonDir = join(projectDir, comparisons[comparisonId].directory);
       if (existsSync(comparisonDir)) {
         rmSync(comparisonDir, { recursive: true, force: true });
       }
-
-      // Update config
-      delete projectConfig.comparisons[comparisonId];
-      saveProjectToDirectory(projectDir, projectConfig);
 
       console.log(chalk.green(`Comparison "${comparisonId}" deleted.`));
       return;
@@ -137,7 +132,7 @@ export const deleteCommand = new Command('delete')
     if (!options.force) {
       if (isInteractive) {
         const snapshotCount = Object.keys(getAllSnapshots(projectDir)).length;
-        const comparisonCount = Object.keys(projectConfig.comparisons || {}).length;
+        const comparisonCount = Object.keys(getAllComparisons(projectDir)).length;
 
         console.log(chalk.yellow(`This will delete project "${projectConfig.name}" including:`));
         console.log(chalk.yellow(`  - ${snapshotCount} snapshot(s)`));

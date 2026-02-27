@@ -5,7 +5,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { join } from 'path';
-import { getAllSnapshots } from '../../lib/visual-regression/snapshot-manager.mjs';
+import { getAllSnapshots, getAllComparisons } from '../../lib/visual-regression/snapshot-manager.mjs';
 import { getAllProjects, projectsDir } from '../../utils/project-manager.mjs';
 
 export const listCommand = new Command('list')
@@ -33,7 +33,7 @@ export const listCommand = new Command('list')
     for (const project of projects) {
       const projectPath = join(projectsDir, project.directoryName);
       const snapshotCount = Object.keys(getAllSnapshots(projectPath)).length;
-      const comparisonCount = project.comparisons ? Object.keys(project.comparisons).length : 0;
+      const comparisonCount = Object.keys(getAllComparisons(projectPath)).length;
 
       console.log(chalk.white.bold(project.name));
       console.log(chalk.cyan(`  Directory: ${project.directoryName}`));
