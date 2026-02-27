@@ -9,7 +9,7 @@ import { join, resolve } from 'path';
 import { select, confirm } from '@inquirer/prompts';
 import { exec } from 'child_process';
 import { platform } from 'os';
-import { compareScreenshots } from '../../lib/visual-regression/comparison.mjs';
+import { compareScreenshots, aggregateScreenshots } from '../../lib/visual-regression/comparison.mjs';
 import { ensureDirectory } from '../../lib/visual-regression/screenshot-set-manager.mjs';
 import { getAllSnapshots } from '../../lib/visual-regression/snapshot-manager.mjs';
 import {
@@ -58,6 +58,7 @@ export const compareCommand = new Command('compare')
   .option('--source <id>', 'Source (before) snapshot ID')
   .option('--target <id>', 'Target (after) snapshot ID')
   .option('--open', 'Open report in browser')
+  .option('--aggregate-screenshots', 'Copy screenshot sets into comparison directory for self-contained static hosting')
   .option('--output-format <format>', 'Output format: html, json', 'html')
   .option('--no-interactive', 'Run non-interactively')
   .action(async (projectArg, options) => {
@@ -108,7 +109,7 @@ export const compareCommand = new Command('compare')
     const snapshotIds = Object.keys(snapshots);
 
     if (snapshotIds.length < 2) {
-      console.error(chalk.red(`Error: Need at least 2 snapshots to compare. Found: ${snapshotIds.length}`));
+      console.error(chalk.red(`Error: Need at least 2 snapshots to compare. Found: ${snapshotIds.length} at ${projectDir} project directory`));
       process.exit(4);
     }
 
@@ -190,6 +191,10 @@ export const compareCommand = new Command('compare')
       ensureDirectory(outputDir);
 
       const result = await compareScreenshots(sourceDir, targetDir, outputDir);
+
+      if (options.aggregateScreenshots) {
+        aggregateScreenshots(sourceDir, targetDir, outputDir);
+      }
 
       // Update project with comparison info
       if (!projectConfig.comparisons) {

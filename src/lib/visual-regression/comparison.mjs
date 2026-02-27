@@ -118,3 +118,42 @@ export async function compareScreenshots(
     };
   }
 }
+
+/**
+ * Copy screenshot sets into the comparison output directory and rewrite
+ * paths in reg.json and index.html so the report is self-contained.
+ *
+ * @param {string} sourceDir - Absolute path to the source screenshot set.
+ * @param {string} targetDir - Absolute path to the target screenshot set.
+ * @param {string} outputDir - Comparison output directory.
+ */
+export function aggregateScreenshots(sourceDir, targetDir, outputDir) {
+  const sourceName = path.basename(sourceDir);
+  const targetName = path.basename(targetDir);
+
+  // Copy screenshot sets into the comparison directory
+  const destSource = path.join(outputDir, 'sets', sourceName);
+  const destTarget = path.join(outputDir, 'sets', targetName);
+  fs.cpSync(sourceDir, destSource, { recursive: true });
+  fs.cpSync(targetDir, destTarget, { recursive: true });
+
+  // Rewrite reg.json paths
+  const regJsonPath = path.join(outputDir, 'reg.json');
+  if (fs.existsSync(regJsonPath)) {
+    const regData = JSON.parse(fs.readFileSync(regJsonPath, 'utf8'));
+    regData.actualDir = `./sets/${sourceName}`;
+    regData.expectedDir = `./sets/${targetName}`;
+    fs.writeFileSync(regJsonPath, JSON.stringify(regData, null, 2), 'utf8');
+  }
+
+  // Rewrite index.html embedded paths
+  const indexPath = path.join(outputDir, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    let html = fs.readFileSync(indexPath, 'utf8');
+    html = html.replace(`"../sets/${sourceName}"`, `"./sets/${sourceName}"`);
+    html = html.replace(`"../sets/${targetName}"`, `"./sets/${targetName}"`);
+    fs.writeFileSync(indexPath, html, 'utf8');
+  }
+
+  console.log(`Aggregated screenshots into ${path.join(outputDir, 'sets')}`);
+}
