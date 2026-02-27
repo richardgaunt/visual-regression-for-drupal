@@ -134,7 +134,9 @@ export function aggregateScreenshots(sourceDir, targetDir, outputDir) {
   // Copy screenshot sets into the comparison directory
   const destSource = path.join(outputDir, 'sets', sourceName);
   const destTarget = path.join(outputDir, 'sets', targetName);
+  // eslint-disable-next-line n/no-unsupported-features/node-builtins
   fs.cpSync(sourceDir, destSource, { recursive: true });
+  // eslint-disable-next-line n/no-unsupported-features/node-builtins
   fs.cpSync(targetDir, destTarget, { recursive: true });
 
   // Rewrite reg.json paths
