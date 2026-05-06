@@ -5,6 +5,34 @@ import path from 'path';
 import fs from 'fs';
 import { Cluster } from 'puppeteer-cluster';
 
+// Hosts whose requests never affect rendering but routinely keep the network
+// "busy" (preventing networkidle0). Blocking them lets the page actually settle
+// under load. Match by hostname suffix.
+const BLOCKED_THIRD_PARTY_HOSTS = [
+  'google-analytics.com',
+  'googletagmanager.com',
+  'doubleclick.net',
+  'googleadservices.com',
+  'youtube.com',
+  'youtu.be',
+  'ytimg.com',
+  'facebook.com',
+  'facebook.net',
+  'connect.facebook.net',
+  'twitter.com',
+  'x.com',
+  'hotjar.com',
+  'fullstory.com',
+  'segment.io',
+  'segment.com',
+];
+
+function isBlockedHost(hostname) {
+  return BLOCKED_THIRD_PARTY_HOSTS.some((suffix) =>
+    hostname === suffix || hostname.endsWith(`.${suffix}`)
+  );
+}
+
 /**
  * Determine appropriate concurrency for screenshot capture.
  * @returns {number}
@@ -58,7 +86,9 @@ export async function captureUrlScreenshots({
   if (!concurrency) {
     concurrency = await determineOptimalConcurrency();
   }
-
+  if (basicAuth) {
+    console.log(`Basic Auth: ${basicAuth.username} and ${basicAuth.password}`);
+  }
   console.log(`📸 Starting screenshot capture for ${baseUrl}`);
   console.log(`🛤️  Paths: ${paths.join(', ')}`);
   console.log(`📱 Viewports: ${viewports.map(v => v.name).join(', ')}`);
@@ -105,9 +135,19 @@ export async function captureUrlScreenshots({
       timeout: 20000,
       retryLimit: 2,
       retryDelay: 1000,
-      monitor: true,
+      // monitor: true clears the terminal every 500ms and hides per-task error logs.
+      monitor: false,
       // Delay between launching workers to prevent system overload
       workerCreationDelay: 300,
+    });
+
+    const failures = [];
+    cluster.on('taskerror', (err, data, willRetry) => {
+      if (willRetry) return;
+      const url = data && data.url;
+      const viewportName = data && data.viewport && data.viewport.name;
+      failures.push({ url, viewport: viewportName, error: err.message });
+      console.error(`✗ ${url} @ ${viewportName}: ${err.message}`);
     });
 
     // eslint-disable-next-line max-len
@@ -119,13 +159,39 @@ export async function captureUrlScreenshots({
         height: viewport.windowHeight,
       });
 
-      // Set basic auth if provided
-      if (basicAuth) {
-        await page.authenticate({
-          username: basicAuth.username,
-          password: basicAuth.password
-        });
+      // Set basic auth if provided.
+      // Use an explicit Authorization header rather than page.authenticate(): when many pages
+      // share one browser context (Cluster.CONCURRENCY_PAGE), the credential-handler
+      // registration races with the auth challenge and Chromium aborts requests with
+      // net::ERR_INVALID_AUTH_CREDENTIALS. A pre-set header sidesteps the prompt entirely.
+      const authHeader = (basicAuth && basicAuth.username)
+        ? `Basic ${Buffer.from(`${basicAuth.username}:${basicAuth.password ?? ''}`).toString('base64')}`
+        : null;
+      if (authHeader) {
+        await page.setExtraHTTPHeaders({ Authorization: authHeader });
       }
+
+      // Block third-party trackers that prevent networkidle0 from firing.
+      // Inject the Authorization header on every continued request: with request
+      // interception enabled, headers set via setExtraHTTPHeaders can be dropped on
+      // intercepted requests, which causes intermittent ERR_INVALID_AUTH_CREDENTIALS.
+      await page.setRequestInterception(true);
+      page.on('request', (req) => {
+        try {
+          const host = new URL(req.url()).hostname;
+          if (isBlockedHost(host)) {
+            req.abort();
+            return;
+          }
+          if (authHeader) {
+            req.continue({ headers: { ...req.headers(), Authorization: authHeader } });
+          } else {
+            req.continue();
+          }
+        } catch {
+          req.continue();
+        }
+      });
 
       // Set session cookies if provided
       if (cookies && cookies.length > 0) {
@@ -142,10 +208,30 @@ export async function captureUrlScreenshots({
       // NOTE: Changed from networkidle0 to networkidle2
       // networkidle0 waits for zero network connections. networkidle2 allows up to 2 active connections,
       // which causes issues with visual regression testing.
-      await page.goto(url, {
-        waitUntil: ['domcontentloaded', 'networkidle0'],
-        timeout: 15000
-      });
+      // If networkidle0 times out we still want a screenshot — the page is normally rendered, the
+      // timeout just means a long-tail subresource never finished. We log and continue, relying on
+      // the settle delay + document.fonts.ready below to capture a stable image.
+      let mainResponseStatus = null;
+      const captureMainResponse = (resp) => {
+        if (resp.url() === url && resp.request().resourceType() === 'document') {
+          mainResponseStatus = resp.status();
+        }
+      };
+      page.on('response', captureMainResponse);
+      try {
+        await page.goto(url, {
+          waitUntil: ['domcontentloaded', 'networkidle0'],
+          timeout: 15000
+        });
+      } catch (err) {
+        if (err.name === 'TimeoutError' && mainResponseStatus && mainResponseStatus < 400) {
+          console.warn(`⚠ ${url} @ ${viewport.name}: networkidle0 timed out (doc=${mainResponseStatus}); capturing anyway`);
+        } else {
+          throw err;
+        }
+      } finally {
+        page.off('response', captureMainResponse);
+      }
 
       // Wait for all fonts (including Google Fonts) to finish loading
       await page.evaluate(() => document.fonts.ready);
@@ -216,6 +302,10 @@ export async function captureUrlScreenshots({
         fullPage: true,
       });
 
+      if (!fs.existsSync(outputPath)) {
+        throw new Error(`Screenshot file was not written to ${outputPath}`);
+      }
+
       return {
         url,
         viewport: viewport.name,
@@ -233,12 +323,26 @@ export async function captureUrlScreenshots({
     // Clean up the run-specific cache directory
     fs.rmSync(cacheDir, { recursive: true, force: true });
 
-    console.log(`✅ Screenshot capture completed for ${baseUrl}`);
+    const successCount = tasks.length - failures.length;
+    if (failures.length > 0) {
+      console.log(`⚠️  Screenshot capture finished: ${successCount}/${tasks.length} succeeded, ${failures.length} failed.`);
+      console.log('Failed captures:');
+      for (const f of failures.slice(0, 10)) {
+        console.log(`  - ${f.url} @ ${f.viewport}: ${f.error}`);
+      }
+      if (failures.length > 10) {
+        console.log(`  …and ${failures.length - 10} more.`);
+      }
+    } else {
+      console.log(`✅ Screenshot capture completed for ${baseUrl} (${successCount}/${tasks.length}).`);
+    }
     return {
       baseUrl,
       paths,
       viewports: viewports.map(v => v.name),
-      count: tasks.length,
+      count: successCount,
+      attempted: tasks.length,
+      failures,
       directory: outputDir
     };
   } catch (error) {

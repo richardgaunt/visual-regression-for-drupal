@@ -5,7 +5,6 @@ import path from 'path';
 import fs from 'fs';
 import { captureUrlScreenshots, determineOptimalConcurrency } from './screenshot.mjs';
 import { ensureDirectory } from './screenshot-set-manager.mjs';
-import { projectsDir } from '../../utils/project-manager.mjs';
 
 /**
  * Write set.json metadata into a snapshot directory
@@ -146,19 +145,22 @@ export function getAllComparisons(projectPath) {
 }
 
 /**
- * Create a new snapshot for a project
+ * Create a new snapshot for a project. This is the single shared path used by
+ * both the interactive menu and the `vr-drupal take` CLI command.
  *
- * @param {string} projectDir - Project directory name
+ * @param {string} projectPath - Absolute path to the project directory
  * @param {string} snapshotId - Snapshot identifier
- * @param {Object} config - Visual regression configuration
- * @param {boolean} [overwrite=false] - Whether to overwrite an existing snapshot
- * @param {Array<{name: string, value: string}>} [cookies=[]] - Session cookies for authenticated access
- * @param {{username: string, password: string}} [basicAuth=null] - Basic auth credentials
+ * @param {Object} config - Visual regression configuration (the `visual-diff` block)
+ * @param {Object} [options]
+ * @param {boolean} [options.overwrite=false] - Whether to overwrite an existing snapshot
+ * @param {Array<{name: string, value: string}>} [options.cookies=[]] - Session cookies
+ * @param {{username: string, password: string}} [options.basicAuth=null] - Basic auth credentials
+ * @param {number} [options.concurrency] - Optional concurrency override
  * @returns {Promise<Object>} - Snapshot information
  */
-// eslint-disable-next-line max-len
-export async function createSnapshot(projectDir, snapshotId, config, overwrite = false, cookies = [], basicAuth = null) {
-  const projectPath = path.join(projectsDir, projectDir);
+export async function createSnapshot(projectPath, snapshotId, config, options = {}) {
+  const { overwrite = false, cookies = [], basicAuth = null, concurrency } = options;
+
   const screenshotSetsBaseDir = path.join(projectPath, 'screenshot-sets');
   const screenshotSetsDir = path.join(screenshotSetsBaseDir, 'sets');
   const snapshotDir = path.join(screenshotSetsDir, snapshotId);
@@ -167,29 +169,26 @@ export async function createSnapshot(projectDir, snapshotId, config, overwrite =
   ensureDirectory(screenshotSetsDir);
 
   const snapshotExists = fs.existsSync(snapshotDir);
-
   if (snapshotExists && !overwrite) {
-    throw new Error(`Snapshot "${snapshotId}" already exists for project "${projectDir}"`);
+    throw new Error(`Snapshot "${snapshotId}" already exists at ${projectPath}`);
   }
-
   if (snapshotExists && overwrite) {
     console.log(`Removing existing snapshot "${snapshotId}"...`);
     fs.rmSync(snapshotDir, { recursive: true, force: true });
   }
-
   ensureDirectory(snapshotDir);
 
-  const concurrency = await determineOptimalConcurrency();
+  const effectiveConcurrency = concurrency ?? await determineOptimalConcurrency();
 
   const result = await captureUrlScreenshots({
     baseUrl: config.base_path,
     paths: config.paths,
     viewports: config.viewports,
     outputDir: snapshotDir,
-    concurrency: concurrency,
+    concurrency: effectiveConcurrency,
     advancedOptions: config.advanced,
-    cookies: cookies,
-    basicAuth: basicAuth
+    cookies,
+    basicAuth,
   });
 
   const snapshotInfo = {
@@ -199,67 +198,36 @@ export async function createSnapshot(projectDir, snapshotId, config, overwrite =
     baseUrl: config.base_path,
     paths: config.paths,
     viewports: config.viewports.map(v => v.name),
-    count: result.count
+    count: result.count,
   };
+
+  writeSetMetadata(projectPath, snapshotId, {
+    date: snapshotInfo.date,
+    count: snapshotInfo.count,
+  });
 
   return snapshotInfo;
 }
 
 /**
- * Update project with snapshot information by writing set.json
- *
- * @param {string} projectDir - Project directory name
- * @param {Object} snapshotInfo - Snapshot information
- * @returns {boolean} - Success status
- */
-export function updateProjectWithSnapshot(projectDir, snapshotInfo) {
-  const projectPath = path.join(projectsDir, projectDir);
-
-  try {
-    writeSetMetadata(projectPath, snapshotInfo.id, {
-      date: snapshotInfo.date,
-      count: snapshotInfo.count
-    });
-    return true;
-  } catch (error) {
-    console.error(`Error updating project with snapshot: ${error.message}`);
-    return false;
-  }
-}
-
-/**
- * Get all snapshots for a project
- *
- * @param {string} projectDir - Project directory name
- * @returns {Object} - Snapshot information
- */
-export function getProjectSnapshots(projectDir) {
-  const projectPath = path.join(projectsDir, projectDir);
-  return getAllSnapshots(projectPath);
-}
-
-/**
  * Get snapshot by ID
  *
- * @param {string} projectDir - Project directory name
+ * @param {string} projectPath - Absolute path to the project directory
  * @param {string} snapshotId - Snapshot identifier
  * @returns {Object|null} - Snapshot information
  */
-export function getSnapshotById(projectDir, snapshotId) {
-  const projectPath = path.join(projectsDir, projectDir);
+export function getSnapshotById(projectPath, snapshotId) {
   return readSetMetadata(projectPath, snapshotId);
 }
 
 /**
  * Delete a snapshot
  *
- * @param {string} projectDir - Project directory name
+ * @param {string} projectPath - Absolute path to the project directory
  * @param {string} snapshotId - Snapshot identifier
  * @returns {boolean} - Success status
  */
-export function deleteSnapshot(projectDir, snapshotId) {
-  const projectPath = path.join(projectsDir, projectDir);
-
+export function deleteSnapshot(projectPath, snapshotId) {
   try {
     const snapshot = readSetMetadata(projectPath, snapshotId);
     if (!snapshot) {

@@ -219,3 +219,7 @@ The module provides a Views-based REST export at `/content-export.json` that ret
 ### Usage
 
 During project setup, the visual regression tool will automatically detect this endpoint and ingest the paths into your project configuration.
+
+## Built On
+
+This project uses [reg-cli](https://github.com/reg-viz/reg-cli) for visual regression comparison and report generation.

@@ -2,30 +2,39 @@
  * Prompts for visual regression configuration
  */
 import chalk from 'chalk';
-import { input, confirm, checkbox } from '@inquirer/prompts';
+import { input, confirm, checkbox, password } from '@inquirer/prompts';
 import { VIEWPORT_PRESETS, isValidUrl, getUrlValidationError, DEFAULT_PATHS } from './config.mjs';
 
 const CIVICTHEME_CONTENT_EXPORT_PATH = '/content-export.json';
 
+function buildAuthHeaders(basicAuth) {
+  if (!basicAuth || !basicAuth.username) {
+    return {};
+  }
+  const token = Buffer.from(`${basicAuth.username}:${basicAuth.password ?? ''}`).toString('base64');
+  return { Authorization: `Basic ${token}` };
+}
+
 /**
  * Fetch CivicTheme content export JSON from a site
  * @param {string} baseUrl - The base URL of the site
- * @returns {Promise<string[]|null>} - Array of paths or null if not found
+ * @param {{username: string, password: string}} [basicAuth] - Optional basic auth credentials
+ * @returns {Promise<{paths: string[]|null, status: number|null, error: Error|null}>}
  */
-async function fetchCivicThemeContentExport(baseUrl) {
+async function fetchCivicThemeContentExport(baseUrl, basicAuth = null) {
   const exportUrl = baseUrl.replace(/\/$/, '') + CIVICTHEME_CONTENT_EXPORT_PATH;
 
   try {
-    const response = await fetch(exportUrl);
+    const response = await fetch(exportUrl, { headers: buildAuthHeaders(basicAuth) });
 
     if (!response.ok) {
-      return null;
+      return { paths: null, status: response.status, error: null };
     }
 
     const data = await response.json();
 
     if (!Array.isArray(data)) {
-      return null;
+      return { paths: null, status: response.status, error: null };
     }
 
     const paths = data
@@ -33,26 +42,26 @@ async function fetchCivicThemeContentExport(baseUrl) {
       .map(item => item.link);
 
     if (paths.length === 0) {
-      return null;
+      return { paths: null, status: response.status, error: null };
     }
 
-    return paths;
-  // eslint-disable-next-line no-unused-vars
+    return { paths, status: response.status, error: null };
   } catch (error) {
-    return null;
+    return { paths: null, status: null, error };
   }
 }
 
 /**
  * Prompt for CivicTheme paths with content export detection
  * @param {string} baseUrl - The base URL of the site
+ * @param {{username: string, password: string}} [basicAuth] - Optional basic auth credentials
  * @returns {Promise<string[]|null>} - Array of paths from CivicTheme export or null to fall back to normal flow
  */
-async function promptForCivicThemePaths(baseUrl) {
+async function promptForCivicThemePaths(baseUrl, basicAuth = null) {
   console.log();
   console.log(chalk.cyan('Checking for CivicTheme content export...'));
 
-  const paths = await fetchCivicThemeContentExport(baseUrl);
+  const { paths, status } = await fetchCivicThemeContentExport(baseUrl, basicAuth);
 
   if (paths) {
     console.log(chalk.green(`✓ Found ${paths.length} pages in CivicTheme content export`));
@@ -70,8 +79,16 @@ async function promptForCivicThemePaths(baseUrl) {
   }
 
   // Content export not found - show instructions
+  const attemptedUrl = baseUrl.replace(/\/$/, '') + CIVICTHEME_CONTENT_EXPORT_PATH;
   console.log();
-  console.log(chalk.yellow('Could not locate the site content export.'));
+  if (status === 401 || status === 403) {
+    console.log(chalk.yellow(`Could not locate the site content export at ${attemptedUrl} (HTTP ${status} — authentication required).`));
+    console.log(chalk.yellow('The credentials supplied were rejected. You can re-enter them and retry.'));
+  } else if (status) {
+    console.log(chalk.yellow(`Could not locate the site content export at ${attemptedUrl} (HTTP ${status}).`));
+  } else {
+    console.log(chalk.yellow(`Could not locate the site content export at ${attemptedUrl}.`));
+  }
   console.log();
   console.log('CivicTheme Visual Regression has a companion module that can be installed');
   console.log('on the Drupal website where you want to carry out the visual regression.');
@@ -82,16 +99,56 @@ async function promptForCivicThemePaths(baseUrl) {
   console.log('If you wish, load this module now.');
   console.log();
 
+  if (status === 401 || status === 403) {
+    const reauth = await confirm({
+      message: 'Re-enter basic auth credentials and retry?',
+      default: true
+    });
+    if (reauth) {
+      const updated = await promptForBasicAuth({ force: true });
+      return promptForCivicThemePaths(baseUrl, updated);
+    }
+  }
+
   const retry = await confirm({
     message: 'Do you wish to try and re-run the page fetch?',
     default: false
   });
 
   if (retry) {
-    return promptForCivicThemePaths(baseUrl);
+    return promptForCivicThemePaths(baseUrl, basicAuth);
   }
 
   return null; // Fall back to normal path selection
+}
+
+/**
+ * Prompt for HTTP basic auth credentials.
+ * @param {Object} [opts]
+ * @param {boolean} [opts.force] - If true, skip the yes/no confirm and ask for credentials directly
+ * @returns {Promise<{username: string, password: string}|null>}
+ */
+export async function promptForBasicAuth({ force = false } = {}) {
+  if (!force) {
+    const required = await confirm({
+      message: 'Does this site require HTTP basic authentication? (e.g. Lagoon/amazee.io dev environments)',
+      default: false
+    });
+    if (!required) {
+      return null;
+    }
+  }
+
+  const username = await input({
+    message: 'Basic auth username:',
+    validate: (value) => value.trim() ? true : 'Username is required'
+  });
+  const pw = await password({
+    message: 'Basic auth password:',
+    mask: '*'
+  });
+
+  return { username, password: pw };
 }
 
 /**
@@ -233,10 +290,11 @@ export async function promptForViewports() {
  */
 export async function promptForVisualRegressionConfig() {
   const baseUrl = await promptForBaseUrl();
+  const basicAuth = await promptForBasicAuth();
   const viewports = await promptForViewports();
 
   // Try CivicTheme content export first, fall back to manual path selection
-  let paths = await promptForCivicThemePaths(baseUrl);
+  let paths = await promptForCivicThemePaths(baseUrl, basicAuth);
   if (!paths) {
     paths = await promptForPaths();
   }
@@ -254,10 +312,16 @@ export async function promptForVisualRegressionConfig() {
     'settle_delay_ms': 2000
   };
 
-  return {
+  const config = {
     base_path: baseUrl,
     paths,
     viewports,
     advanced
   };
+
+  if (basicAuth) {
+    config.basic_auth = basicAuth;
+  }
+
+  return config;
 }
