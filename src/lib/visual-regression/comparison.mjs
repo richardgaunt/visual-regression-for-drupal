@@ -8,6 +8,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { ensureDirectory } from './screenshot-set-manager.mjs';
 import { determineOptimalConcurrency } from './screenshot.mjs';
+import { URL_DECORATOR_SCRIPT } from './url-decorator-script.mjs';
 
 // Get the tool's root directory to find the installed reg-cli
 const __filename = fileURLToPath(import.meta.url);
@@ -87,6 +88,8 @@ export async function compareScreenshots(
       { stdio: 'inherit' },
     );
 
+    injectUrlsIntoReport(sourceDir, targetDir, outputDir);
+
     const statistics = extractComparisonStatistics(`${outputDir}/reg.json`);
 
     const result = {
@@ -116,6 +119,62 @@ export async function compareScreenshots(
         error: error.message
       }
     };
+  }
+}
+
+function readUrlMap(setDir) {
+  const urlsPath = path.join(setDir, 'urls.json');
+  if (!fs.existsSync(urlsPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(urlsPath, 'utf8'));
+  } catch (error) {
+    console.warn(`Could not parse ${urlsPath}: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * After reg-cli has generated index.html, inject a URL mapping (window.__reg_urls__)
+ * and a small DOM-decorator script so each item in the report is annotated with a
+ * link to the source URL it was captured from.
+ *
+ * Silently no-ops if neither set has a urls.json (preserves backwards-compat with
+ * older sets captured before this feature existed).
+ *
+ * @param {string} sourceDir - Source (expected/before) screenshot set directory.
+ * @param {string} targetDir - Target (actual/after) screenshot set directory.
+ * @param {string} outputDir - Comparison output directory.
+ */
+export function injectUrlsIntoReport(sourceDir, targetDir, outputDir) {
+  const expected = readUrlMap(sourceDir);
+  const actual = readUrlMap(targetDir);
+  if (!expected && !actual) return;
+
+  const indexPath = path.join(outputDir, 'index.html');
+  if (!fs.existsSync(indexPath)) return;
+
+  const payload = { expected: expected || {}, actual: actual || {} };
+  const marker = '<!-- vr-url-injection -->';
+  const injection =
+    `${marker}\n` +
+    `<script>window.__reg_urls__ = ${JSON.stringify(payload)};</script>\n` +
+    `<script>${URL_DECORATOR_SCRIPT}</script>\n`;
+
+  let html = fs.readFileSync(indexPath, 'utf8');
+  if (html.includes(marker)) return;
+  html = html.replace('</body>', `${injection}</body>`);
+  fs.writeFileSync(indexPath, html, 'utf8');
+
+  // Also expose the mapping in reg.json for programmatic consumers.
+  const regJsonPath = path.join(outputDir, 'reg.json');
+  if (fs.existsSync(regJsonPath)) {
+    try {
+      const regData = JSON.parse(fs.readFileSync(regJsonPath, 'utf8'));
+      regData.urls = payload;
+      fs.writeFileSync(regJsonPath, JSON.stringify(regData, null, 2), 'utf8');
+    } catch (error) {
+      console.warn(`Could not annotate reg.json with URLs: ${error.message}`);
+    }
   }
 }
 

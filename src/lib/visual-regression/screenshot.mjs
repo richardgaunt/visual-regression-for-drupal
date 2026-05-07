@@ -34,6 +34,32 @@ function isBlockedHost(hostname) {
 }
 
 /**
+ * Build a mapping of screenshot file (relative to the set directory) to the
+ * source URL it was captured from. Mirrors the file-naming logic used when
+ * queuing tasks so the mapping stays in sync if either side changes.
+ *
+ * @param {Object} options
+ * @param {string} options.baseUrl
+ * @param {Array<string>} options.paths
+ * @param {Array<{name: string}>} options.viewports
+ * @returns {Object<string, string>} - { "<viewport>/<file>.png": "<url>" }
+ */
+export function buildUrlMap({ baseUrl, paths, viewports }) {
+  const map = {};
+  for (const viewport of viewports) {
+    const viewportName = viewport.name.toLowerCase();
+    for (const urlPath of paths) {
+      const url = new URL(urlPath, baseUrl).href;
+      const sanitizedPath = urlPath === '/'
+        ? 'homepage'
+        : urlPath.replace(/^\//, '').replace(/\//g, '-');
+      map[`${viewportName}/${sanitizedPath}.png`] = url;
+    }
+  }
+  return map;
+}
+
+/**
  * Determine appropriate concurrency for screenshot capture.
  * @returns {number}
  */
@@ -96,24 +122,33 @@ export async function captureUrlScreenshots({
   console.log(`⚡ Concurrency: ${concurrency}`);
 
   try {
+    const urlMap = buildUrlMap({ baseUrl, paths, viewports });
     const tasks = [];
 
     for (const viewport of viewports) {
-      const viewportDir = path.join(outputDir, viewport.name.toLowerCase());
+      const viewportName = viewport.name.toLowerCase();
+      const viewportDir = path.join(outputDir, viewportName);
       if (!fs.existsSync(viewportDir)) {
         fs.mkdirSync(viewportDir, { recursive: true });
       }
 
       for (const urlPath of paths) {
-        const url = new URL(urlPath, baseUrl).href;
         const sanitizedPath = urlPath === '/'
           ? 'homepage'
           : urlPath.replace(/^\//, '').replace(/\//g, '-');
+        const fileKey = `${viewportName}/${sanitizedPath}.png`;
         const outputPath = path.join(viewportDir, `${sanitizedPath}.png`);
+        const url = urlMap[fileKey];
 
         tasks.push({ url, viewport, outputPath, advancedOptions, cookies, basicAuth, baseUrl });
       }
     }
+
+    fs.writeFileSync(
+      path.join(outputDir, 'urls.json'),
+      JSON.stringify(urlMap, null, 2),
+      'utf8'
+    );
 
     // Create a unique cache directory for this run to share cache within the run
     // but maintain isolation between separate visual regression runs
